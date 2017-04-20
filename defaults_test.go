@@ -24,13 +24,13 @@ type Sample struct {
 	String    string        `default:"hello"`
 	Duration  time.Duration `default:"10s"`
 
-	Struct *struct{}       `default:""`
-	Map    map[string]bool `default:""`
-	Slice  []string        `default:""`
+	Struct    struct{}        `default:"{}"`
+	StructPtr *struct{}       `default:"{}"`
+	Map       map[string]bool `default:"{}"`
+	Slice     []string        `default:"{}"`
 
-	EmptyStruct struct{} `default:"{}"`
-	Empty       string   `default:""`
-	NoDefault   string
+	Empty     string `default:""`
+	NoDefault string
 }
 
 func TestInit(t *testing.T) {
@@ -88,7 +88,7 @@ func TestInit(t *testing.T) {
 	if sample.String != "hello" {
 		t.Errorf("it should initialize string")
 	}
-	if sample.Struct == nil {
+	if sample.StructPtr == nil {
 		t.Errorf("it should initialize struct")
 	}
 	if sample.Map == nil {
