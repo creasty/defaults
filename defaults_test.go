@@ -1,6 +1,7 @@
 package defaults
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -36,6 +37,10 @@ type Sample struct {
 
 	Empty     string `default:""`
 	NoDefault string
+
+	NonInitialString string `default:"foo"`
+	NonInitialSlice  []int  `default:"[123]"`
+	NonInitialStruct Struct `default:"{}"`
 }
 
 type Struct struct {
@@ -49,7 +54,11 @@ func (s *Struct) SetDefaults() {
 }
 
 func TestInit(t *testing.T) {
-	sample := new(Sample)
+	sample := &Sample{
+		NonInitialString: "string",
+		NonInitialSlice:  []int{1, 2, 3},
+		NonInitialStruct: Struct{Foo: 123},
+	}
 
 	if err := SetDefaults(sample); err != nil {
 		t.Fatalf("it should return an error: %v", err)
@@ -142,12 +151,24 @@ func TestInit(t *testing.T) {
 		}
 	})
 
-	t.Run("Defaulter interface", func(t *testing.T) {
+	t.Run("Setter interface", func(t *testing.T) {
 		if sample.Struct.Bar != 456 {
 			t.Errorf("it should initialize struct")
 		}
 		if sample.StructPtr == nil || sample.StructPtr.Bar != 456 {
 			t.Errorf("it should initialize struct pointer")
+		}
+	})
+
+	t.Run("non-initial value", func(t *testing.T) {
+		if sample.NonInitialString != "string" {
+			t.Errorf("it should not override non-initial value")
+		}
+		if !reflect.DeepEqual(sample.NonInitialSlice, []int{1, 2, 3}) {
+			t.Errorf("it should not override non-initial value")
+		}
+		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Foo: 123}) {
+			t.Errorf("it should not override non-initial value")
 		}
 	})
 }

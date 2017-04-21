@@ -67,8 +67,8 @@ func setField(field reflect.Value, defaultVal string) {
 			field.Set(reflect.ValueOf(int32(val)))
 		}
 	case reflect.Int64:
-		if t, err := time.ParseDuration(defaultVal); err == nil {
-			field.Set(reflect.ValueOf(t))
+		if val, err := time.ParseDuration(defaultVal); err == nil {
+			field.Set(reflect.ValueOf(val))
 		} else if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
 			field.Set(reflect.ValueOf(val))
 		}
