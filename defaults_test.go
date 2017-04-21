@@ -39,8 +39,9 @@ type Sample struct {
 }
 
 type Struct struct {
-	Foo int
-	Bar int
+	Foo         int
+	Bar         int
+	WithDefault string `default:"foo"`
 }
 
 func (s *Struct) SetDefaults() {
@@ -114,6 +115,15 @@ func TestInit(t *testing.T) {
 		}
 		if sample.Slice == nil {
 			t.Errorf("it should initialize slice")
+		}
+	})
+
+	t.Run("nested", func(t *testing.T) {
+		if sample.Struct.WithDefault != "foo" {
+			t.Errorf("it should set default on inner field in struct")
+		}
+		if sample.StructPtr == nil || sample.StructPtr.WithDefault != "foo" {
+			t.Errorf("it should set default on inner field in struct pointer")
 		}
 	})
 
