@@ -32,7 +32,7 @@ Supported types
 - Complex types
   - `map` and `slice`
   - `struct`
-- [`defaults.Defaulter`](./defaults_setter.go) interface
+- [`defaults.Setter`](./setter.go) interface
 
 
 Take a look at [defaults_test.go](./defaults_test.go).
@@ -77,7 +77,7 @@ type Struct struct {
 	WithDefault string `default:"foo"`
 }
 
-// SetDefaults implements defaults.Defaulter interface
+// SetDefaults implements defaults.Setter interface
 func (s *Struct) SetDefaults() {
 	s.Bar = 456
 }

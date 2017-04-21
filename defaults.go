@@ -128,11 +128,11 @@ func setField(field reflect.Value, defaultVal string) {
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		setField(val.Elem(), defaultVal)
-		callDefaultsSetter(field.Interface())
+		callSetter(field.Interface())
 	} else {
 		val := reflect.New(field.Type())
 		val.Elem().Set(field)
-		callDefaultsSetter(val.Interface())
+		callSetter(val.Interface())
 		field.Set(val.Elem())
 	}
 }
