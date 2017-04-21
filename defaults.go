@@ -1,6 +1,7 @@
 package defaults
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strconv"
@@ -104,8 +105,18 @@ func setField(field reflect.Value, defaultVal string) {
 	case reflect.String:
 		field.Set(reflect.ValueOf(defaultVal))
 	case reflect.Slice:
-		field.Set(reflect.MakeSlice(field.Type(), 0, 0))
+		val := reflect.New(field.Type())
+		val.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
+		json.Unmarshal([]byte(defaultVal), val.Interface())
+		field.Set(val.Elem())
 	case reflect.Map:
-		field.Set(reflect.MakeMap(field.Type()))
+		val := reflect.New(field.Type())
+		val.Elem().Set(reflect.MakeMap(field.Type()))
+		json.Unmarshal([]byte(defaultVal), val.Interface())
+		field.Set(val.Elem())
+	case reflect.Struct:
+		val := reflect.New(field.Type())
+		json.Unmarshal([]byte(defaultVal), val.Interface())
+		field.Set(val.Elem())
 	}
 }
