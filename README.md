@@ -1,6 +1,9 @@
 defaults
 ========
 
+[![Build Status](https://travis-ci.org/creasty/defaults.svg?branch=master)](https://travis-ci.org/creasty/defaults)
+[![codecov](https://codecov.io/gh/creasty/defaults/branch/master/graph/badge.svg)](https://codecov.io/gh/creasty/defaults)
+
 Initialize members in struct with default values
 
 
