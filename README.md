@@ -35,7 +35,7 @@ Supported types
 - `defaults.Defaulter` interface
 
 
-Take a look into [defaults_test.go](./defaults_test.go).
+Take a look at [defaults_test.go](./defaults_test.go).
 
 ```go
 type Sample struct {
