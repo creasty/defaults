@@ -125,6 +125,7 @@ func setField(field reflect.Value, defaultVal string) {
 	case reflect.Struct:
 		val := reflect.New(field.Type())
 		json.Unmarshal([]byte(defaultVal), val.Interface())
+		Init(val.Interface())
 		field.Set(val.Elem())
 	case reflect.Ptr:
 		val := reflect.New(field.Type().Elem())
