@@ -16,6 +16,11 @@ const (
 	fieldName = "default"
 )
 
+// Initializer is an interface for setting default values
+type Initializer interface {
+	SetDefaults()
+}
+
 // Init initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
@@ -125,5 +130,9 @@ func setField(field reflect.Value, defaultVal string) {
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		setField(val.Elem(), defaultVal)
+	}
+
+	if initializer, ok := field.Interface().(Initializer); ok {
+		initializer.SetDefaults()
 	}
 }
