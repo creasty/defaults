@@ -16,11 +16,6 @@ const (
 	fieldName = "default"
 )
 
-// Defaulter is an interface for setting default values
-type Defaulter interface {
-	SetDefaults()
-}
-
 // SetDefaults initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
@@ -133,17 +128,11 @@ func setField(field reflect.Value, defaultVal string) {
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		setField(val.Elem(), defaultVal)
-		setDefaults(field.Interface())
+		callDefaultsSetter(field.Interface())
 	} else {
 		val := reflect.New(field.Type())
 		val.Elem().Set(field)
-		setDefaults(val.Interface())
+		callDefaultsSetter(val.Interface())
 		field.Set(val.Elem())
-	}
-}
-
-func setDefaults(v interface{}) {
-	if defaulter, ok := v.(Defaulter); ok {
-		defaulter.SetDefaults()
 	}
 }
