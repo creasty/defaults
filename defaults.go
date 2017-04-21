@@ -38,62 +38,70 @@ func Init(ptr interface{}) error {
 }
 
 func setField(field reflect.Value, defaultVal string) {
-	var val interface{}
-	var err error
+	if !field.CanSet() {
+		return
+	}
 
 	switch field.Kind() {
 	case reflect.Bool:
-		val, err = strconv.ParseBool(defaultVal)
+		if val, err := strconv.ParseBool(defaultVal); err == nil {
+			field.Set(reflect.ValueOf(val))
+		}
 	case reflect.Int:
-		val, err = strconv.ParseInt(defaultVal, 10, 64)
-		val = int(val.(int64))
+		if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
+			field.Set(reflect.ValueOf(int(val)))
+		}
 	case reflect.Int8:
-		val, err = strconv.ParseInt(defaultVal, 10, 8)
-		val = int8(val.(int64))
+		if val, err := strconv.ParseInt(defaultVal, 10, 8); err == nil {
+			field.Set(reflect.ValueOf(int8(val)))
+		}
 	case reflect.Int16:
-		val, err = strconv.ParseInt(defaultVal, 10, 16)
-		val = int16(val.(int64))
+		if val, err := strconv.ParseInt(defaultVal, 10, 16); err == nil {
+			field.Set(reflect.ValueOf(int16(val)))
+		}
 	case reflect.Int32:
-		val, err = strconv.ParseInt(defaultVal, 10, 32)
-		val = int32(val.(int64))
+		if val, err := strconv.ParseInt(defaultVal, 10, 32); err == nil {
+			field.Set(reflect.ValueOf(int32(val)))
+		}
 	case reflect.Int64:
 		if t, err := time.ParseDuration(defaultVal); err == nil {
-			val = t
-		} else {
-			val, err = strconv.ParseInt(defaultVal, 10, 64)
+			field.Set(reflect.ValueOf(t))
+		} else if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
+			field.Set(reflect.ValueOf(val))
 		}
 	case reflect.Uint:
-		val, err = strconv.ParseUint(defaultVal, 10, 64)
-		val = uint(val.(uint64))
+		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+			field.Set(reflect.ValueOf(uint(val)))
+		}
 	case reflect.Uint8:
-		val, err = strconv.ParseUint(defaultVal, 10, 8)
-		val = uint8(val.(uint64))
+		if val, err := strconv.ParseUint(defaultVal, 10, 8); err == nil {
+			field.Set(reflect.ValueOf(uint8(val)))
+		}
 	case reflect.Uint16:
-		val, err = strconv.ParseUint(defaultVal, 10, 16)
-		val = uint16(val.(uint64))
+		if val, err := strconv.ParseUint(defaultVal, 10, 16); err == nil {
+			field.Set(reflect.ValueOf(uint16(val)))
+		}
 	case reflect.Uint32:
-		val, err = strconv.ParseUint(defaultVal, 10, 32)
-		val = uint32(val.(uint64))
+		if val, err := strconv.ParseUint(defaultVal, 10, 32); err == nil {
+			field.Set(reflect.ValueOf(uint32(val)))
+		}
 	case reflect.Uint64:
-		val, err = strconv.ParseUint(defaultVal, 10, 64)
+		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+			field.Set(reflect.ValueOf(val))
+		}
 	case reflect.Uintptr:
-		val, err = strconv.ParseUint(defaultVal, 10, 64)
-		val = uintptr(val.(uint64))
+		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+			field.Set(reflect.ValueOf(uintptr(val)))
+		}
 	case reflect.Float32:
-		val, err = strconv.ParseFloat(defaultVal, 32)
-		val = float32(val.(float64))
+		if val, err := strconv.ParseFloat(defaultVal, 32); err == nil {
+			field.Set(reflect.ValueOf(float32(val)))
+		}
 	case reflect.Float64:
-		val, err = strconv.ParseFloat(defaultVal, 64)
+		if val, err := strconv.ParseFloat(defaultVal, 64); err == nil {
+			field.Set(reflect.ValueOf(val))
+		}
 	case reflect.String:
-		val = defaultVal
-	default:
-		return
-	}
-
-	if err != nil {
-		return
-	}
-	if field.CanSet() {
-		field.Set(reflect.ValueOf(val))
+		field.Set(reflect.ValueOf(defaultVal))
 	}
 }
