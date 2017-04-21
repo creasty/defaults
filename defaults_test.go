@@ -38,9 +38,10 @@ type Sample struct {
 	Empty     string `default:""`
 	NoDefault string
 
-	NonInitialString string `default:"foo"`
-	NonInitialSlice  []int  `default:"[123]"`
-	NonInitialStruct Struct `default:"{}"`
+	NonInitialString    string  `default:"foo"`
+	NonInitialSlice     []int   `default:"[123]"`
+	NonInitialStruct    Struct  `default:"{}"`
+	NonInitialStructPtr *Struct `default:"{}"`
 }
 
 type Struct struct {
@@ -55,9 +56,10 @@ func (s *Struct) SetDefaults() {
 
 func TestInit(t *testing.T) {
 	sample := &Sample{
-		NonInitialString: "string",
-		NonInitialSlice:  []int{1, 2, 3},
-		NonInitialStruct: Struct{Foo: 123},
+		NonInitialString:    "string",
+		NonInitialSlice:     []int{1, 2, 3},
+		NonInitialStruct:    Struct{Foo: 123},
+		NonInitialStructPtr: &Struct{Foo: 123},
 	}
 
 	if err := SetDefaults(sample); err != nil {
@@ -168,6 +170,9 @@ func TestInit(t *testing.T) {
 			t.Errorf("it should not override non-initial value")
 		}
 		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Foo: 123}) {
+			t.Errorf("it should not override non-initial value")
+		}
+		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Foo: 123}) {
 			t.Errorf("it should not override non-initial value")
 		}
 	})

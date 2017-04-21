@@ -45,6 +45,10 @@ func setField(field reflect.Value, defaultVal string) {
 		return
 	}
 
+	if !reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface()) {
+		return
+	}
+
 	switch field.Kind() {
 	case reflect.Bool:
 		if val, err := strconv.ParseBool(defaultVal); err == nil {
