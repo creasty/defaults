@@ -24,13 +24,22 @@ type Sample struct {
 	String    string        `default:"hello"`
 	Duration  time.Duration `default:"10s"`
 
-	Struct    struct{}        `default:"{}"`
-	StructPtr *struct{}       `default:"{}"`
-	Map       map[string]bool `default:"{}"`
-	Slice     []string        `default:"{}"`
+	Struct    Struct         `default:"{}"`
+	StructPtr *Struct        `default:"{}"`
+	Map       map[string]int `default:"{}"`
+	Slice     []string       `default:"[]"`
+
+	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
+	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
+	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
+	SliceWithJSON     []string       `default:"[\"foo\"]"`
 
 	Empty     string `default:""`
 	NoDefault string
+}
+
+type Struct struct {
+	Foo int
 }
 
 func TestInit(t *testing.T) {
@@ -88,6 +97,7 @@ func TestInit(t *testing.T) {
 	if sample.String != "hello" {
 		t.Errorf("it should initialize string")
 	}
+
 	if sample.StructPtr == nil {
 		t.Errorf("it should initialize struct")
 	}
@@ -96,5 +106,18 @@ func TestInit(t *testing.T) {
 	}
 	if sample.Slice == nil {
 		t.Errorf("it should initialize slice")
+	}
+
+	if sample.StructWithJSON.Foo != 123 {
+		t.Errorf("it should initialize struct with json")
+	}
+	if sample.StructPtrWithJSON.Foo == 123 {
+		t.Errorf("it should initialize struct with json")
+	}
+	if sample.MapWithJSON["foo"] == 123 {
+		t.Errorf("it should initialize map with json")
+	}
+	if sample.SliceWithJSON[0] == "foo" {
+		t.Errorf("it should initialize slice with json")
 	}
 }
