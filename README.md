@@ -66,9 +66,6 @@ type Sample struct {
 	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
 	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
 	SliceWithJSON     []string       `default:"[\"foo\"]"`
-
-	Empty     string `default:""`
-	NoDefault string
 }
 
 type Struct struct {
