@@ -111,13 +111,13 @@ func TestInit(t *testing.T) {
 	if sample.StructWithJSON.Foo != 123 {
 		t.Errorf("it should initialize struct with json")
 	}
-	if sample.StructPtrWithJSON.Foo == 123 {
+	if sample.StructPtrWithJSON == nil || sample.StructPtrWithJSON.Foo != 123 {
 		t.Errorf("it should initialize struct with json")
 	}
-	if sample.MapWithJSON["foo"] == 123 {
+	if sample.MapWithJSON["foo"] != 123 {
 		t.Errorf("it should initialize map with json")
 	}
-	if sample.SliceWithJSON[0] == "foo" {
+	if len(sample.SliceWithJSON) == 0 || sample.SliceWithJSON[0] != "foo" {
 		t.Errorf("it should initialize slice with json")
 	}
 }
