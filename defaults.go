@@ -103,5 +103,7 @@ func setField(field reflect.Value, defaultVal string) {
 		}
 	case reflect.String:
 		field.Set(reflect.ValueOf(defaultVal))
+	case reflect.Slice:
+		field.Set(reflect.MakeSlice(field.Type(), 0, 0))
 	}
 }
