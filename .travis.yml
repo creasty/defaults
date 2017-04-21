@@ -1,0 +1,9 @@
+language: go
+go:       1.7
+
+branches:
+  only:
+    - master
+
+script:
+  - go test -v .
