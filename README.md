@@ -32,7 +32,7 @@ Supported types
 - Complex types
   - `map` and `slice`
   - `struct`
-- `defaults.Defaulter` interface
+- [`defaults.Defaulter`](./defaults_setter.go) interface
 
 
 Take a look at [defaults_test.go](./defaults_test.go).
