@@ -51,7 +51,7 @@ func (s *Struct) SetDefaults() {
 func TestInit(t *testing.T) {
 	sample := new(Sample)
 
-	if err := Init(sample); err != nil {
+	if err := SetDefaults(sample); err != nil {
 		t.Fatalf("it should return an error: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestInit(t *testing.T) {
 		}
 	})
 
-	t.Run("Initializer interface", func(t *testing.T) {
+	t.Run("Defaulter interface", func(t *testing.T) {
 		if sample.Struct.Bar != 456 {
 			t.Errorf("it should initialize struct")
 		}

@@ -16,15 +16,15 @@ const (
 	fieldName = "default"
 )
 
-// Initializer is an interface for setting default values
-type Initializer interface {
+// Defaulter is an interface for setting default values
+type Defaulter interface {
 	SetDefaults()
 }
 
-// Init initializes members in a struct referenced by a pointer.
+// SetDefaults initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
-func Init(ptr interface{}) error {
+func SetDefaults(ptr interface{}) error {
 	if reflect.TypeOf(ptr).Kind() != reflect.Ptr {
 		return errInvalidType
 	}
@@ -125,15 +125,25 @@ func setField(field reflect.Value, defaultVal string) {
 	case reflect.Struct:
 		val := reflect.New(field.Type())
 		json.Unmarshal([]byte(defaultVal), val.Interface())
-		Init(val.Interface())
+		SetDefaults(val.Interface())
 		field.Set(val.Elem())
-	case reflect.Ptr:
+	}
+
+	if field.Kind() == reflect.Ptr {
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		setField(val.Elem(), defaultVal)
+		setDefaults(field.Interface())
+	} else {
+		val := reflect.New(field.Type())
+		val.Elem().Set(field)
+		setDefaults(val.Interface())
+		field.Set(val.Elem())
 	}
+}
 
-	if initializer, ok := field.Interface().(Initializer); ok {
-		initializer.SetDefaults()
+func setDefaults(v interface{}) {
+	if defaulter, ok := v.(Defaulter); ok {
+		defaulter.SetDefaults()
 	}
 }
