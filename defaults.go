@@ -12,7 +12,9 @@ var (
 	errInvalidType = errors.New("not a struct pointer")
 )
 
-const defaultFieldName = "default"
+const (
+	fieldName = "default"
+)
 
 // Init initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
@@ -30,7 +32,7 @@ func Init(ptr interface{}) error {
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(defaultFieldName); defaultVal != "" {
+		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "" {
 			setField(v.Field(i), defaultVal)
 		}
 	}
@@ -102,6 +104,7 @@ func setField(field reflect.Value, defaultVal string) {
 		if val, err := strconv.ParseFloat(defaultVal, 64); err == nil {
 			field.Set(reflect.ValueOf(val))
 		}
+
 	case reflect.String:
 		field.Set(reflect.ValueOf(defaultVal))
 	case reflect.Slice:
@@ -118,5 +121,9 @@ func setField(field reflect.Value, defaultVal string) {
 		val := reflect.New(field.Type())
 		json.Unmarshal([]byte(defaultVal), val.Interface())
 		field.Set(val.Elem())
+	case reflect.Ptr:
+		val := reflect.New(field.Type().Elem())
+		field.Set(val)
+		setField(val.Elem(), defaultVal)
 	}
 }

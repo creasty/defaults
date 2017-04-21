@@ -99,7 +99,7 @@ func TestInit(t *testing.T) {
 	}
 
 	if sample.StructPtr == nil {
-		t.Errorf("it should initialize struct")
+		t.Errorf("it should initialize struct pointer")
 	}
 	if sample.Map == nil {
 		t.Errorf("it should initialize map")
@@ -112,7 +112,7 @@ func TestInit(t *testing.T) {
 		t.Errorf("it should initialize struct with json")
 	}
 	if sample.StructPtrWithJSON == nil || sample.StructPtrWithJSON.Foo != 123 {
-		t.Errorf("it should initialize struct with json")
+		t.Errorf("it should initialize struct pointer with json")
 	}
 	if sample.MapWithJSON["foo"] != 123 {
 		t.Errorf("it should initialize map with json")
