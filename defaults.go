@@ -114,16 +114,22 @@ func setField(field reflect.Value, defaultVal string) {
 	case reflect.Slice:
 		val := reflect.New(field.Type())
 		val.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
-		json.Unmarshal([]byte(defaultVal), val.Interface())
+		if defaultVal != "[]" {
+			json.Unmarshal([]byte(defaultVal), val.Interface())
+		}
 		field.Set(val.Elem())
 	case reflect.Map:
 		val := reflect.New(field.Type())
 		val.Elem().Set(reflect.MakeMap(field.Type()))
-		json.Unmarshal([]byte(defaultVal), val.Interface())
+		if defaultVal != "{}" {
+			json.Unmarshal([]byte(defaultVal), val.Interface())
+		}
 		field.Set(val.Elem())
 	case reflect.Struct:
 		val := reflect.New(field.Type())
-		json.Unmarshal([]byte(defaultVal), val.Interface())
+		if defaultVal != "{}" {
+			json.Unmarshal([]byte(defaultVal), val.Interface())
+		}
 		SetDefaults(val.Interface())
 		field.Set(val.Elem())
 	}
