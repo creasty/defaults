@@ -6,6 +6,26 @@ import (
 	"time"
 )
 
+type (
+	MyInt     int
+	MyInt8    int8
+	MyInt16   int16
+	MyInt32   int32
+	MyInt64   int64
+	MyUint    uint
+	MyUint8   uint8
+	MyUint16  uint16
+	MyUint32  uint32
+	MyUint64  uint64
+	MyUintptr uintptr
+	MyFloat32 float32
+	MyFloat64 float64
+	MyBool    bool
+	MyString  string
+	MyMap     map[string]int
+	MySlice   []int
+)
+
 type Sample struct {
 	Int       int           `default:"1"`
 	Int8      int8          `default:"8"`
@@ -29,6 +49,25 @@ type Sample struct {
 	StructPtr *Struct        `default:"{}"`
 	Map       map[string]int `default:"{}"`
 	Slice     []string       `default:"[]"`
+
+	MyInt       MyInt     `default:"1"`
+	MyInt8      MyInt8    `default:"8"`
+	MyInt16     MyInt16   `default:"16"`
+	MyInt32     MyInt32   `default:"32"`
+	MyInt64     MyInt64   `default:"64"`
+	MyUint      MyUint    `default:"1"`
+	MyUint8     MyUint8   `default:"8"`
+	MyUint16    MyUint16  `default:"16"`
+	MyUint32    MyUint32  `default:"32"`
+	MyUint64    MyUint64  `default:"64"`
+	MyUintptr   MyUintptr `default:"1"`
+	MyFloat32   MyFloat32 `default:"1.32"`
+	MyFloat64   MyFloat64 `default:"1.64"`
+	MyBoolTrue  MyBool    `default:"true"`
+	MyBoolFalse MyBool    `default:"false"`
+	MyString    MyString  `default:"hello"`
+	MyMap       MyMap     `default:"{}"`
+	MySlice     MySlice   `default:"[]"`
 
 	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
 	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
@@ -125,6 +164,64 @@ func TestInit(t *testing.T) {
 			t.Errorf("it should initialize map")
 		}
 		if sample.Slice == nil {
+			t.Errorf("it should initialize slice")
+		}
+	})
+
+	t.Run("aliased types", func(t *testing.T) {
+		if sample.MyInt != 1 {
+			t.Errorf("it should initialize int")
+		}
+		if sample.MyInt8 != 8 {
+			t.Errorf("it should initialize int8")
+		}
+		if sample.MyInt16 != 16 {
+			t.Errorf("it should initialize int16")
+		}
+		if sample.MyInt32 != 32 {
+			t.Errorf("it should initialize int32")
+		}
+		if sample.MyInt64 != 64 {
+			t.Errorf("it should initialize int64")
+		}
+		if sample.MyUint != 1 {
+			t.Errorf("it should initialize uint")
+		}
+		if sample.MyUint8 != 8 {
+			t.Errorf("it should initialize uint8")
+		}
+		if sample.MyUint16 != 16 {
+			t.Errorf("it should initialize uint16")
+		}
+		if sample.MyUint32 != 32 {
+			t.Errorf("it should initialize uint32")
+		}
+		if sample.MyUint64 != 64 {
+			t.Errorf("it should initialize uint64")
+		}
+		if sample.MyUintptr != 1 {
+			t.Errorf("it should initialize uintptr")
+		}
+		if sample.MyFloat32 != 1.32 {
+			t.Errorf("it should initialize float32")
+		}
+		if sample.MyFloat64 != 1.64 {
+			t.Errorf("it should initialize float64")
+		}
+		if sample.MyBoolTrue != true {
+			t.Errorf("it should initialize bool (true)")
+		}
+		if sample.MyBoolFalse != false {
+			t.Errorf("it should initialize bool (false)")
+		}
+		if sample.MyString != "hello" {
+			t.Errorf("it should initialize string")
+		}
+
+		if sample.MyMap == nil {
+			t.Errorf("it should initialize map")
+		}
+		if sample.MySlice == nil {
 			t.Errorf("it should initialize slice")
 		}
 	})
