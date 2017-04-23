@@ -62,7 +62,7 @@ func TestInit(t *testing.T) {
 		NonInitialStructPtr: &Struct{Foo: 123},
 	}
 
-	if err := SetDefaults(sample); err != nil {
+	if err := Set(sample); err != nil {
 		t.Fatalf("it should return an error: %v", err)
 	}
 

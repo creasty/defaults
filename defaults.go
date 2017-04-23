@@ -16,10 +16,10 @@ const (
 	fieldName = "default"
 )
 
-// SetDefaults initializes members in a struct referenced by a pointer.
+// Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
-func SetDefaults(ptr interface{}) error {
+func Set(ptr interface{}) error {
 	if reflect.TypeOf(ptr).Kind() != reflect.Ptr {
 		return errInvalidType
 	}
@@ -140,7 +140,7 @@ func setField(field reflect.Value, defaultVal string) {
 	default:
 		ref := reflect.New(field.Type())
 		ref.Elem().Set(field)
-		SetDefaults(ref.Interface())
+		Set(ref.Interface())
 		callSetter(ref.Interface())
 		field.Set(ref.Elem())
 	}

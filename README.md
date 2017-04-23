@@ -12,7 +12,7 @@ Usage
 
 ```go
 obj := &SampleStruct{}
-if err := defaults.SetDefaults(obj); err != nil {
+if err := defaults.Set(obj); err != nil {
 	panic(err)
 }
 ```
