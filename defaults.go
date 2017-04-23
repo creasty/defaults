@@ -45,104 +45,107 @@ func setField(field reflect.Value, defaultVal string) {
 		return
 	}
 
-	if !reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface()) {
-		return
+	if isInitialValue(field) {
+		switch field.Kind() {
+		case reflect.Bool:
+			if val, err := strconv.ParseBool(defaultVal); err == nil {
+				field.Set(reflect.ValueOf(val))
+			}
+		case reflect.Int:
+			if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
+				field.Set(reflect.ValueOf(int(val)))
+			}
+		case reflect.Int8:
+			if val, err := strconv.ParseInt(defaultVal, 10, 8); err == nil {
+				field.Set(reflect.ValueOf(int8(val)))
+			}
+		case reflect.Int16:
+			if val, err := strconv.ParseInt(defaultVal, 10, 16); err == nil {
+				field.Set(reflect.ValueOf(int16(val)))
+			}
+		case reflect.Int32:
+			if val, err := strconv.ParseInt(defaultVal, 10, 32); err == nil {
+				field.Set(reflect.ValueOf(int32(val)))
+			}
+		case reflect.Int64:
+			if val, err := time.ParseDuration(defaultVal); err == nil {
+				field.Set(reflect.ValueOf(val))
+			} else if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
+				field.Set(reflect.ValueOf(val))
+			}
+		case reflect.Uint:
+			if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+				field.Set(reflect.ValueOf(uint(val)))
+			}
+		case reflect.Uint8:
+			if val, err := strconv.ParseUint(defaultVal, 10, 8); err == nil {
+				field.Set(reflect.ValueOf(uint8(val)))
+			}
+		case reflect.Uint16:
+			if val, err := strconv.ParseUint(defaultVal, 10, 16); err == nil {
+				field.Set(reflect.ValueOf(uint16(val)))
+			}
+		case reflect.Uint32:
+			if val, err := strconv.ParseUint(defaultVal, 10, 32); err == nil {
+				field.Set(reflect.ValueOf(uint32(val)))
+			}
+		case reflect.Uint64:
+			if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+				field.Set(reflect.ValueOf(val))
+			}
+		case reflect.Uintptr:
+			if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
+				field.Set(reflect.ValueOf(uintptr(val)))
+			}
+		case reflect.Float32:
+			if val, err := strconv.ParseFloat(defaultVal, 32); err == nil {
+				field.Set(reflect.ValueOf(float32(val)))
+			}
+		case reflect.Float64:
+			if val, err := strconv.ParseFloat(defaultVal, 64); err == nil {
+				field.Set(reflect.ValueOf(val))
+			}
+
+		case reflect.String:
+			field.Set(reflect.ValueOf(defaultVal))
+		case reflect.Slice:
+			ref := reflect.New(field.Type())
+			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
+			if defaultVal != "[]" {
+				json.Unmarshal([]byte(defaultVal), ref.Interface())
+			}
+			field.Set(ref.Elem())
+		case reflect.Map:
+			ref := reflect.New(field.Type())
+			ref.Elem().Set(reflect.MakeMap(field.Type()))
+			if defaultVal != "{}" {
+				json.Unmarshal([]byte(defaultVal), ref.Interface())
+			}
+			field.Set(ref.Elem())
+		case reflect.Struct:
+			ref := reflect.New(field.Type())
+			if defaultVal != "{}" {
+				json.Unmarshal([]byte(defaultVal), ref.Interface())
+			}
+			field.Set(ref.Elem())
+		case reflect.Ptr:
+			field.Set(reflect.New(field.Type().Elem()))
+		}
 	}
 
 	switch field.Kind() {
-	case reflect.Bool:
-		if val, err := strconv.ParseBool(defaultVal); err == nil {
-			field.Set(reflect.ValueOf(val))
-		}
-	case reflect.Int:
-		if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(int(val)))
-		}
-	case reflect.Int8:
-		if val, err := strconv.ParseInt(defaultVal, 10, 8); err == nil {
-			field.Set(reflect.ValueOf(int8(val)))
-		}
-	case reflect.Int16:
-		if val, err := strconv.ParseInt(defaultVal, 10, 16); err == nil {
-			field.Set(reflect.ValueOf(int16(val)))
-		}
-	case reflect.Int32:
-		if val, err := strconv.ParseInt(defaultVal, 10, 32); err == nil {
-			field.Set(reflect.ValueOf(int32(val)))
-		}
-	case reflect.Int64:
-		if val, err := time.ParseDuration(defaultVal); err == nil {
-			field.Set(reflect.ValueOf(val))
-		} else if val, err := strconv.ParseInt(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(val))
-		}
-	case reflect.Uint:
-		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(uint(val)))
-		}
-	case reflect.Uint8:
-		if val, err := strconv.ParseUint(defaultVal, 10, 8); err == nil {
-			field.Set(reflect.ValueOf(uint8(val)))
-		}
-	case reflect.Uint16:
-		if val, err := strconv.ParseUint(defaultVal, 10, 16); err == nil {
-			field.Set(reflect.ValueOf(uint16(val)))
-		}
-	case reflect.Uint32:
-		if val, err := strconv.ParseUint(defaultVal, 10, 32); err == nil {
-			field.Set(reflect.ValueOf(uint32(val)))
-		}
-	case reflect.Uint64:
-		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(val))
-		}
-	case reflect.Uintptr:
-		if val, err := strconv.ParseUint(defaultVal, 10, 64); err == nil {
-			field.Set(reflect.ValueOf(uintptr(val)))
-		}
-	case reflect.Float32:
-		if val, err := strconv.ParseFloat(defaultVal, 32); err == nil {
-			field.Set(reflect.ValueOf(float32(val)))
-		}
-	case reflect.Float64:
-		if val, err := strconv.ParseFloat(defaultVal, 64); err == nil {
-			field.Set(reflect.ValueOf(val))
-		}
-
-	case reflect.String:
-		field.Set(reflect.ValueOf(defaultVal))
-	case reflect.Slice:
-		val := reflect.New(field.Type())
-		val.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
-		if defaultVal != "[]" {
-			json.Unmarshal([]byte(defaultVal), val.Interface())
-		}
-		field.Set(val.Elem())
-	case reflect.Map:
-		val := reflect.New(field.Type())
-		val.Elem().Set(reflect.MakeMap(field.Type()))
-		if defaultVal != "{}" {
-			json.Unmarshal([]byte(defaultVal), val.Interface())
-		}
-		field.Set(val.Elem())
-	case reflect.Struct:
-		val := reflect.New(field.Type())
-		if defaultVal != "{}" {
-			json.Unmarshal([]byte(defaultVal), val.Interface())
-		}
-		SetDefaults(val.Interface())
-		field.Set(val.Elem())
-	}
-
-	if field.Kind() == reflect.Ptr {
-		val := reflect.New(field.Type().Elem())
-		field.Set(val)
-		setField(val.Elem(), defaultVal)
+	case reflect.Ptr:
+		setField(field.Elem(), defaultVal)
 		callSetter(field.Interface())
-	} else {
-		val := reflect.New(field.Type())
-		val.Elem().Set(field)
-		callSetter(val.Interface())
-		field.Set(val.Elem())
+	default:
+		ref := reflect.New(field.Type())
+		ref.Elem().Set(field)
+		SetDefaults(ref.Interface())
+		callSetter(ref.Interface())
+		field.Set(ref.Elem())
 	}
+}
+
+func isInitialValue(field reflect.Value) bool {
+	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
