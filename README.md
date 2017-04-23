@@ -12,18 +12,15 @@ Initialize members in struct with default values
   - Scalar types
     - `int/8/16/32/64`, `uint/8/16/32/64`, `float32/64`
     - `uintptr`, `time.Duration`
-    - `bool`
-    - `string`
+    - `bool`, `string`
   - Complex types
-    - `map`
-    - `slice`
-    - `struct`
+    - `map`, `slice`, `struct`
   - Aliased types
     - e.g., `type Enum string`
   - Pointer types
     - e.g., `*SampleStruct`, `*int`
-- Recursively initializes
-- Dynamically set default values by [`defaults.Setter`](./setter.go) interface
+- Recursively initializes fields in struct
+- Dynamically sets default values by [`defaults.Setter`](./setter.go) interface
 - Preserves non-initial values from being reset with default values
 
 
@@ -36,7 +33,7 @@ type Gender string
 type Sample struct {
 	Name   string `default:"John Smith"`
 	Age    int    `default:"27"`
-	Gender Gender `default:"f"` // Supports aliased types
+	Gender Gender `default:"m"` // Supports aliased types
 
 	Slice       []string       `default:"[]"`
 	Map         []string       `default:"{}"`
@@ -49,6 +46,7 @@ type Sample struct {
 
 type OtherStruct struct {
 	Hello  string `default:"world"` // Default tags in nested struct also work
+	Foo    string
 	Random int
 }
 
