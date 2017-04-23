@@ -3,6 +3,8 @@ defaults
 
 [![Build Status](https://travis-ci.org/creasty/defaults.svg?branch=master)](https://travis-ci.org/creasty/defaults)
 [![codecov](https://codecov.io/gh/creasty/defaults/branch/master/graph/badge.svg)](https://codecov.io/gh/creasty/defaults)
+[![GitHub release](https://img.shields.io/github/release/creasty/defaults.svg)](https://github.com/creasty/defaults/releases)
+[![License](https://img.shields.io/github/license/creasty/defaults.svg)](./LICENSE)
 
 Initialize members in struct with default values
 
