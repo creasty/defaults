@@ -169,11 +169,11 @@ func TestInit(t *testing.T) {
 		if !reflect.DeepEqual(sample.NonInitialSlice, []int{1, 2, 3}) {
 			t.Errorf("it should not override non-initial value")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Foo: 123}) {
-			t.Errorf("it should not override non-initial value")
+		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Foo: 123, Bar: 456, WithDefault: "foo"}) {
+			t.Errorf("it should not override non-initial value but set defaults for fields")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Foo: 123}) {
-			t.Errorf("it should not override non-initial value")
+		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Foo: 123, Bar: 456, WithDefault: "foo"}) {
+			t.Errorf("it should not override non-initial value but set defaults for fields")
 		}
 	})
 }
