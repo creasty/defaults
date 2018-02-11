@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/creasty/defaults/internal/fixture"
 )
 
 type (
@@ -113,6 +115,12 @@ func TestInit(t *testing.T) {
 	if err := Set(sample); err != nil {
 		t.Fatalf("it should return an error: %v", err)
 	}
+
+	if err := Set(1); err == nil {
+		t.Fatalf("it should return an error when used for a non-pointer type")
+	}
+
+	Set(&fixture.Sample{}) // should not panic
 
 	t.Run("scalar types", func(t *testing.T) {
 		if sample.Int != 1 {
