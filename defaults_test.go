@@ -74,8 +74,11 @@ type Sample struct {
 	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
 	SliceWithJSON     []string       `default:"[\"foo\"]"`
 
-	Empty     string `default:""`
-	NoDefault string
+	Empty string `default:""`
+
+	NoDefault       *string `default:"-"`
+	NoDefaultStruct Struct  `default:"-"`
+	StructWithNoTag Struct
 
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
@@ -84,6 +87,8 @@ type Sample struct {
 }
 
 type Struct struct {
+	Emmbeded `default:"{}"`
+
 	Foo         int
 	Bar         int
 	WithDefault string `default:"foo"`
@@ -91,6 +96,10 @@ type Struct struct {
 
 func (s *Struct) SetDefaults() {
 	s.Bar = 456
+}
+
+type Emmbeded struct {
+	Int int `default:"1"`
 }
 
 func TestInit(t *testing.T) {
@@ -233,6 +242,9 @@ func TestInit(t *testing.T) {
 		if sample.StructPtr == nil || sample.StructPtr.WithDefault != "foo" {
 			t.Errorf("it should set default on inner field in struct pointer")
 		}
+		if sample.Struct.Emmbeded.Int != 1 {
+			t.Errorf("it should set default on an emmbeded struct")
+		}
 	})
 
 	t.Run("complex types with json", func(t *testing.T) {
@@ -266,11 +278,23 @@ func TestInit(t *testing.T) {
 		if !reflect.DeepEqual(sample.NonInitialSlice, []int{1, 2, 3}) {
 			t.Errorf("it should not override non-initial value")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Foo: 123, Bar: 456, WithDefault: "foo"}) {
+		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
 			t.Errorf("it should not override non-initial value but set defaults for fields")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Foo: 123, Bar: 456, WithDefault: "foo"}) {
+		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
 			t.Errorf("it should not override non-initial value but set defaults for fields")
+		}
+	})
+
+	t.Run("opt-out", func(t *testing.T) {
+		if sample.StructWithNoTag.WithDefault != "foo" {
+			t.Errorf("it should automatically recurse into a struct even without a tag")
+		}
+		if sample.NoDefault != nil {
+			t.Errorf("it should not be set")
+		}
+		if sample.NoDefaultStruct.WithDefault != "" {
+			t.Errorf("it should not initialize a struct with default values")
 		}
 	})
 }
