@@ -167,3 +167,8 @@ func isEquivalentToInitialValue(kind reflect.Kind, tag string) bool {
 
 	return false
 }
+
+// CanUpdate returns true when the given value is an initial value of its type
+func CanUpdate(v interface{}) bool {
+	return isInitialValue(reflect.ValueOf(v))
+}
