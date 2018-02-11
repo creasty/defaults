@@ -36,18 +36,20 @@ type Sample struct {
 	Gender Gender `default:"m"` // Supports aliased types
 
 	Slice       []string       `default:"[]"`
-	Map         []string       `default:"{}"`
+	Map         map[string]int `default:"{}"`
 	SliceByJSON []int          `default:"[1, 2, 3]"` // Supports JSON format
 	MapByJSON   map[string]int `default:"{\"foo\": 123}"`
 
 	Struct    OtherStruct  `default:"{}"`
 	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
+
+	OptOut OtherStruct `default:"-"` // Opt-out
 }
 
 type OtherStruct struct {
 	Hello  string `default:"world"` // Default tags in nested struct also work
-	Foo    string
-	Random int
+	Foo    string `default:"-"`
+	Random int    `default:"-"`
 }
 
 // SetDefaults implements defaults.Setter interface
