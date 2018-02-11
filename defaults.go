@@ -45,6 +45,10 @@ func setField(field reflect.Value, defaultVal string) {
 		return
 	}
 
+	if isEquivalentToInitialValue(field.Kind(), defaultVal) {
+		return
+	}
+
 	if isInitialValue(field) {
 		switch field.Kind() {
 		case reflect.Bool:
@@ -111,20 +115,20 @@ func setField(field reflect.Value, defaultVal string) {
 		case reflect.Slice:
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
-			if defaultVal != "[]" {
+			if defaultVal != "" && defaultVal != "[]" {
 				json.Unmarshal([]byte(defaultVal), ref.Interface())
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Map:
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeMap(field.Type()))
-			if defaultVal != "{}" {
+			if defaultVal != "" && defaultVal != "{}" {
 				json.Unmarshal([]byte(defaultVal), ref.Interface())
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
 			ref := reflect.New(field.Type())
-			if defaultVal != "{}" {
+			if defaultVal != "" && defaultVal != "{}" {
 				json.Unmarshal([]byte(defaultVal), ref.Interface())
 			}
 			field.Set(ref.Elem())
@@ -148,4 +152,18 @@ func setField(field reflect.Value, defaultVal string) {
 
 func isInitialValue(field reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
+}
+
+func isEquivalentToInitialValue(kind reflect.Kind, tag string) bool {
+	switch kind {
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Uintptr,
+		reflect.Float32, reflect.Float64,
+		reflect.String:
+		return (tag == "")
+	}
+
+	return false
 }
