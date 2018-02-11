@@ -43,6 +43,7 @@ type Sample struct {
 	Struct    OtherStruct  `default:"{}"`
 	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
 
+	NoTag  OtherStruct               // Recurse into a nested struct even without a tag
 	OptOut OtherStruct `default:"-"` // Opt-out
 }
 
