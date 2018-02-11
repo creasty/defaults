@@ -32,7 +32,7 @@ func Set(ptr interface{}) error {
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "" {
+		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "-" {
 			setField(v.Field(i), defaultVal)
 		}
 	}
