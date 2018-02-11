@@ -54,7 +54,9 @@ type OtherStruct struct {
 
 // SetDefaults implements defaults.Setter interface
 func (s *OtherStruct) SetDefaults() {
-	s.Random = rand.Int() // You can dynamically set default
+	if (defaults.CanUpdate(s.Random)) { // Check if the value is initial (recommended)
+		s.Random = rand.Int() // You can dynamically set default
+	}
 }
 ```
 
