@@ -45,7 +45,7 @@ func setField(field reflect.Value, defaultVal string) {
 		return
 	}
 
-	if isEquivalentToInitialValue(field.Kind(), defaultVal) {
+	if !shouldInitializeField(field.Kind(), defaultVal) {
 		return
 	}
 
@@ -154,18 +154,13 @@ func isInitialValue(field reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
 
-func isEquivalentToInitialValue(kind reflect.Kind, tag string) bool {
+func shouldInitializeField(kind reflect.Kind, tag string) bool {
 	switch kind {
-	case reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Uintptr,
-		reflect.Float32, reflect.Float64,
-		reflect.String:
-		return (tag == "")
+	case reflect.Struct:
+		return true
 	}
 
-	return false
+	return (tag != "")
 }
 
 // CanUpdate returns true when the given value is an initial value of its type
