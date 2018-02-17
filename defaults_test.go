@@ -80,7 +80,11 @@ type Sample struct {
 
 	NoDefault       *string `default:"-"`
 	NoDefaultStruct Struct  `default:"-"`
-	StructWithNoTag Struct
+
+	MapWithNoTag       map[string]int
+	SliceWithNoTag     []string
+	StructPtrWithNoTag *Struct
+	StructWithNoTag    Struct
 
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
@@ -294,10 +298,22 @@ func TestInit(t *testing.T) {
 		}
 	})
 
-	t.Run("opt-out", func(t *testing.T) {
+	t.Run("no tag", func(t *testing.T) {
+		if sample.MapWithNoTag != nil {
+			t.Errorf("it should not initialize pointer type (map)")
+		}
+		if sample.SliceWithNoTag != nil {
+			t.Errorf("it should not initialize pointer type (slice)")
+		}
+		if sample.StructPtrWithNoTag != nil {
+			t.Errorf("it should not initialize pointer type (struct)")
+		}
 		if sample.StructWithNoTag.WithDefault != "foo" {
 			t.Errorf("it should automatically recurse into a struct even without a tag")
 		}
+	})
+
+	t.Run("opt-out", func(t *testing.T) {
 		if sample.NoDefault != nil {
 			t.Errorf("it should not be set")
 		}
