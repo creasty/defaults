@@ -33,20 +33,22 @@ func Set(ptr interface{}) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "-" {
-			setField(v.Field(i), defaultVal)
+			if err := setField(v.Field(i), defaultVal); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func setField(field reflect.Value, defaultVal string) {
+func setField(field reflect.Value, defaultVal string) error {
 	if !field.CanSet() {
-		return
+		return nil
 	}
 
 	if !shouldInitializeField(field.Kind(), defaultVal) {
-		return
+		return nil
 	}
 
 	if isInitialValue(field) {
@@ -116,20 +118,26 @@ func setField(field reflect.Value, defaultVal string) {
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
 			if defaultVal != "" && defaultVal != "[]" {
-				json.Unmarshal([]byte(defaultVal), ref.Interface())
+				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+					return err
+				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Map:
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeMap(field.Type()))
 			if defaultVal != "" && defaultVal != "{}" {
-				json.Unmarshal([]byte(defaultVal), ref.Interface())
+				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+					return err
+				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
 			ref := reflect.New(field.Type())
 			if defaultVal != "" && defaultVal != "{}" {
-				json.Unmarshal([]byte(defaultVal), ref.Interface())
+				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+					return err
+				}
 			}
 			field.Set(ref.Elem())
 		case reflect.Ptr:
@@ -141,13 +149,17 @@ func setField(field reflect.Value, defaultVal string) {
 	case reflect.Ptr:
 		setField(field.Elem(), defaultVal)
 		callSetter(field.Interface())
-	default:
+	case reflect.Struct:
 		ref := reflect.New(field.Type())
 		ref.Elem().Set(field)
-		Set(ref.Interface())
+		if err := Set(ref.Interface()); err != nil {
+			return err
+		}
 		callSetter(ref.Interface())
 		field.Set(ref.Elem())
 	}
+
+	return nil
 }
 
 func isInitialValue(field reflect.Value) bool {

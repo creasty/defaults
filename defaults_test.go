@@ -117,10 +117,15 @@ func TestInit(t *testing.T) {
 	}
 
 	if err := Set(sample); err != nil {
-		t.Fatalf("it should return an error: %v", err)
+		t.Fatalf("it should not return an error: %v", err)
 	}
 
-	if err := Set(1); err == nil {
+	nonPtrVal := 1
+
+	if err := Set(nonPtrVal); err == nil {
+		t.Fatalf("it should return an error when used for a non-pointer type")
+	}
+	if err := Set(&nonPtrVal); err == nil {
 		t.Fatalf("it should return an error when used for a non-pointer type")
 	}
 
@@ -272,6 +277,36 @@ func TestInit(t *testing.T) {
 		if len(sample.SliceWithJSON) == 0 || sample.SliceWithJSON[0] != "foo" {
 			t.Errorf("it should initialize slice with json")
 		}
+
+		t.Run("invalid json", func(t *testing.T) {
+			if err := Set(&struct {
+				I []int `default:"[!]"`
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				I map[string]int `default:"{1}"`
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				S struct {
+					I []int
+				} `default:"{!}"`
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				S struct {
+					I []int `default:"[!]"`
+				}
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+		})
 	})
 
 	t.Run("Setter interface", func(t *testing.T) {
