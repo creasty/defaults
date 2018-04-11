@@ -120,7 +120,12 @@ func TestInit(t *testing.T) {
 		t.Fatalf("it should not return an error: %v", err)
 	}
 
-	if err := Set(1); err == nil {
+	nonPtrVal := 1
+
+	if err := Set(nonPtrVal); err == nil {
+		t.Fatalf("it should return an error when used for a non-pointer type")
+	}
+	if err := Set(&nonPtrVal); err == nil {
 		t.Fatalf("it should return an error when used for a non-pointer type")
 	}
 
