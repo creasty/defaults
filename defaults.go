@@ -118,7 +118,6 @@ func setField(field reflect.Value, defaultVal string) error {
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
 			if defaultVal != "" && defaultVal != "[]" {
-				println(defaultVal)
 				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
 					return err
 				}

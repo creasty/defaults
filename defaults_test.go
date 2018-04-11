@@ -281,6 +281,20 @@ func TestInit(t *testing.T) {
 			}
 
 			if err := Set(&struct {
+				I map[string]int `default:"{1}"`
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				S struct {
+					I []int
+				} `default:"{!}"`
+			}{}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
 				S struct {
 					I []int `default:"[!]"`
 				}
