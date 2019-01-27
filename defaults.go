@@ -157,6 +157,20 @@ func setField(field reflect.Value, defaultVal string) error {
 		}
 		callSetter(ref.Interface())
 		field.Set(ref.Elem())
+	case reflect.Slice:
+		for j := 0; j < field.Len(); j++ {
+			sliceItem := field.Index(j)
+			if sliceItem.Kind() != reflect.Struct {
+				continue
+			}
+			ref := reflect.New(sliceItem.Type())
+			ref.Elem().Set(sliceItem)
+			if err := Set(ref.Interface()); err != nil {
+				return err
+			}
+			callSetter(ref.Interface())
+			sliceItem.Set(ref.Elem())
+		}
 	}
 
 	return nil
@@ -171,6 +185,8 @@ func shouldInitializeField(kind reflect.Kind, tag string) bool {
 	case reflect.Struct:
 		return true
 	}
+	case reflect.Slice:
+		return true
 
 	return (tag != "")
 }
