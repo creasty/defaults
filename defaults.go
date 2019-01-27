@@ -184,9 +184,9 @@ func shouldInitializeField(kind reflect.Kind, tag string) bool {
 	switch kind {
 	case reflect.Struct:
 		return true
-	}
 	case reflect.Slice:
 		return true
+	}
 
 	return (tag != "")
 }
