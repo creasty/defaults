@@ -159,17 +159,9 @@ func setField(field reflect.Value, defaultVal string) error {
 		field.Set(ref.Elem())
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			sliceItem := field.Index(j)
-			if sliceItem.Kind() != reflect.Struct {
-				continue
-			}
-			ref := reflect.New(sliceItem.Type())
-			ref.Elem().Set(sliceItem)
-			if err := Set(ref.Interface()); err != nil {
+			if err := setField(field.Index(j), defaultVal); err != nil {
 				return err
 			}
-			callSetter(ref.Interface())
-			sliceItem.Set(ref.Elem())
 		}
 	}
 
