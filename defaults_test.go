@@ -339,6 +339,9 @@ func TestInit(t *testing.T) {
 		if sample.MapWithNoTag != nil {
 			t.Errorf("it should not initialize pointer type (map)")
 		}
+		if sample.SliceWithNoTag != nil {
+			t.Errorf("it should not initialize pointer type (slice)")
+		}
 		if sample.StructPtrWithNoTag != nil {
 			t.Errorf("it should not initialize pointer type (struct)")
 		}
