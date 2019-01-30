@@ -47,7 +47,7 @@ func setField(field reflect.Value, defaultVal string) error {
 		return nil
 	}
 
-	if !shouldInitializeField(field.Kind(), defaultVal) {
+	if !shouldInitializeField(field, defaultVal) {
 		return nil
 	}
 
@@ -157,6 +157,12 @@ func setField(field reflect.Value, defaultVal string) error {
 		}
 		callSetter(ref.Interface())
 		field.Set(ref.Elem())
+	case reflect.Slice:
+		for j := 0; j < field.Len(); j++ {
+			if err := setField(field.Index(j), defaultVal); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -166,10 +172,12 @@ func isInitialValue(field reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
 
-func shouldInitializeField(kind reflect.Kind, tag string) bool {
-	switch kind {
+func shouldInitializeField(field reflect.Value, tag string) bool {
+	switch field.Kind() {
 	case reflect.Struct:
 		return true
+	case reflect.Slice:
+		return field.Len() > 0 || tag != ""
 	}
 
 	return (tag != "")

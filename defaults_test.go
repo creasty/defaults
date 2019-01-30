@@ -81,10 +81,11 @@ type Sample struct {
 	NoDefault       *string `default:"-"`
 	NoDefaultStruct Struct  `default:"-"`
 
-	MapWithNoTag       map[string]int
-	SliceWithNoTag     []string
-	StructPtrWithNoTag *Struct
-	StructWithNoTag    Struct
+	MapWithNoTag                map[string]int
+	SliceWithNoTag              []string
+	StructPtrWithNoTag          *Struct
+	StructWithNoTag             Struct
+	DeepSliceOfStructsWithNoTag [][][]Struct
 
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
@@ -110,10 +111,11 @@ type Emmbeded struct {
 
 func TestInit(t *testing.T) {
 	sample := &Sample{
-		NonInitialString:    "string",
-		NonInitialSlice:     []int{1, 2, 3},
-		NonInitialStruct:    Struct{Foo: 123},
-		NonInitialStructPtr: &Struct{Foo: 123},
+		NonInitialString:            "string",
+		NonInitialSlice:             []int{1, 2, 3},
+		NonInitialStruct:            Struct{Foo: 123},
+		NonInitialStructPtr:         &Struct{Foo: 123},
+		DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
 	}
 
 	if err := Set(sample); err != nil {
@@ -345,6 +347,9 @@ func TestInit(t *testing.T) {
 		}
 		if sample.StructWithNoTag.WithDefault != "foo" {
 			t.Errorf("it should automatically recurse into a struct even without a tag")
+		}
+		if !reflect.DeepEqual(sample.DeepSliceOfStructsWithNoTag, [][][]Struct{{{{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}}}}) {
+			t.Errorf("it should automatically recurse into a slice of structs even without a tag")
 		}
 	})
 
