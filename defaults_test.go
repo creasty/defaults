@@ -5,7 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/creasty/defaults/internal/fixture"
+	"github.com/teamlint/defaults/internal/fixture"
+)
+
+const (
+	vTime = "2019-04-01 17:39:48"
 )
 
 type (
@@ -26,6 +30,7 @@ type (
 	MyString  string
 	MyMap     map[string]int
 	MySlice   []int
+	MyTime    time.Time
 )
 
 type Sample struct {
@@ -51,6 +56,7 @@ type Sample struct {
 	StructPtr *Struct        `default:"{}"`
 	Map       map[string]int `default:"{}"`
 	Slice     []string       `default:"[]"`
+	Time      time.Time      `default:"2019-04-01 17:39:48"`
 
 	MyInt       MyInt     `default:"1"`
 	MyInt8      MyInt8    `default:"8"`
@@ -70,6 +76,7 @@ type Sample struct {
 	MyString    MyString  `default:"hello"`
 	MyMap       MyMap     `default:"{}"`
 	MySlice     MySlice   `default:"[]"`
+	// MyTime      MyTime    `default:"2019-04-01 17:39:48"`
 
 	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
 	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
@@ -182,6 +189,11 @@ func TestInit(t *testing.T) {
 		if sample.String != "hello" {
 			t.Errorf("it should initialize string")
 		}
+		testTime, _ := time.Parse("2006-01-02 15:04:05", vTime)
+		if sample.Time.Year() != testTime.Year() || sample.Time.Month() != testTime.Month() || sample.Time.Day() != testTime.Day() || sample.Time.Hour() != testTime.Hour() || sample.Time.Minute() != testTime.Minute() || sample.Time.Second() != testTime.Second() {
+			t.Errorf("it should initialize time")
+		}
+		// t.Logf("time: %v\n", sample.Time)
 	})
 
 	t.Run("complex types", func(t *testing.T) {
