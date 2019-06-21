@@ -6,7 +6,7 @@ defaults
 [![GitHub release](https://img.shields.io/github/release/creasty/defaults.svg)](https://github.com/creasty/defaults/releases)
 [![License](https://img.shields.io/github/license/creasty/defaults.svg)](./LICENSE)
 
-Initialize members in a struct with a default value
+Initialize structs with default values
 
 - Supports almost all kind of types
   - Scalar types
@@ -36,27 +36,27 @@ type Sample struct {
 	Gender Gender `default:"m"`
 
 	Slice       []string       `default:"[]"`
-	SliceByJSON []int          `default:"[1, 2, 3]"` // Supports JSON format
+	SliceByJSON []int          `default:"[1, 2, 3]"` // Supports JSON
 	Map         map[string]int `default:"{}"`
 	MapByJSON   map[string]int `default:"{\"foo\": 123}"`
 
 	Struct    OtherStruct  `default:"{}"`
 	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
 
-	NoTag  OtherStruct               // Recurses into a nested struct even without a tag
+	NoTag  OtherStruct               // Recurses into a nested struct by default
 	OptOut OtherStruct `default:"-"` // Opt-out
 }
 
 type OtherStruct struct {
 	Hello  string `default:"world"` // Tags in a nested struct also work
-	Foo    string `default:"-"`
+	Foo    int    `default:"-"`
 	Random int    `default:"-"`
 }
 
 // SetDefaults implements defaults.Setter interface
 func (s *OtherStruct) SetDefaults() {
-	if (defaults.CanUpdate(s.Random)) { // Check if the value is initial (recommended)
-		s.Random = rand.Int() // Set a value dynamically
+	if defaults.CanUpdate(s.Random) { // Check if it's a zero value (recommended)
+		s.Random = rand.Int() // Set a dynamic value
 	}
 }
 ```
