@@ -389,3 +389,20 @@ func TestCanUpdate(t *testing.T) {
 		}
 	}
 }
+
+type Child struct {
+	Name string `default:"Tom"`
+	Age  int    `default:"20"`
+}
+
+type Parent struct {
+	Child *Child
+}
+
+func TestPointerStructMember(t *testing.T) {
+	m := Parent{Child: &Child{Name: "Jim"}}
+	Set(&m)
+	if m.Child.Age != 20 {
+		t.Errorf("20 is expected")
+	}
+}
