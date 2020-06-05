@@ -172,14 +172,14 @@ func shouldInitializeField(field reflect.Value, tag string) bool {
 	case reflect.Struct:
 		return true
 	case reflect.Ptr:
-		if field.Interface() != nil && field.Elem().Kind() == reflect.Struct {
+		if !field.IsNil() && field.Elem().Kind() == reflect.Struct {
 			return true
 		}
 	case reflect.Slice:
 		return field.Len() > 0 || tag != ""
 	}
 
-	return (tag != "")
+	return tag != ""
 }
 
 // CanUpdate returns true when the given value is an initial value of its type
