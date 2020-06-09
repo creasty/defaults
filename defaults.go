@@ -151,7 +151,6 @@ func setField(field reflect.Value, defaultVal string) error {
 		if err := Set(field.Addr().Interface()); err != nil {
 			return err
 		}
-		callSetter(field.Addr().Interface())
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
 			if err := setField(field.Index(j), defaultVal); err != nil {
