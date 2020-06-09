@@ -38,7 +38,7 @@ func Set(ptr interface{}) error {
 			}
 		}
 	}
-
+	callSetter(ptr)
 	return nil
 }
 
@@ -133,13 +133,11 @@ func setField(field reflect.Value, defaultVal string) error {
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
-			ref := reflect.New(field.Type())
 			if defaultVal != "" && defaultVal != "{}" {
-				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+				if err := json.Unmarshal([]byte(defaultVal), field.Addr().Interface()); err != nil {
 					return err
 				}
 			}
-			field.Set(ref.Elem())
 		case reflect.Ptr:
 			field.Set(reflect.New(field.Type().Elem()))
 		}
@@ -150,13 +148,9 @@ func setField(field reflect.Value, defaultVal string) error {
 		setField(field.Elem(), defaultVal)
 		callSetter(field.Interface())
 	case reflect.Struct:
-		ref := reflect.New(field.Type())
-		ref.Elem().Set(field)
-		if err := Set(ref.Interface()); err != nil {
+		if err := Set(field.Addr().Interface()); err != nil {
 			return err
 		}
-		callSetter(ref.Interface())
-		field.Set(ref.Elem())
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
 			if err := setField(field.Index(j), defaultVal); err != nil {
@@ -176,11 +170,15 @@ func shouldInitializeField(field reflect.Value, tag string) bool {
 	switch field.Kind() {
 	case reflect.Struct:
 		return true
+	case reflect.Ptr:
+		if !field.IsNil() && field.Elem().Kind() == reflect.Struct {
+			return true
+		}
 	case reflect.Slice:
 		return field.Len() > 0 || tag != ""
 	}
 
-	return (tag != "")
+	return tag != ""
 }
 
 // CanUpdate returns true when the given value is an initial value of its type
