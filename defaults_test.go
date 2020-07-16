@@ -47,6 +47,39 @@ type Sample struct {
 	String    string        `default:"hello"`
 	Duration  time.Duration `default:"10s"`
 
+	IntOct    int    `default:"0o1"`
+	Int8Oct   int8   `default:"0o10"`
+	Int16Oct  int16  `default:"0o20"`
+	Int32Oct  int32  `default:"0o40"`
+	Int64Oct  int64  `default:"0o100"`
+	UintOct   uint   `default:"0o1"`
+	Uint8Oct  uint8  `default:"0o10"`
+	Uint16Oct uint16 `default:"0o20"`
+	Uint32Oct uint32 `default:"0o40"`
+	Uint64Oct uint64 `default:"0o100"`
+
+	IntHex    int    `default:"0x1"`
+	Int8Hex   int8   `default:"0x8"`
+	Int16Hex  int16  `default:"0x10"`
+	Int32Hex  int32  `default:"0x20"`
+	Int64Hex  int64  `default:"0x40"`
+	UintHex   uint   `default:"0x1"`
+	Uint8Hex  uint8  `default:"0x8"`
+	Uint16Hex uint16 `default:"0x10"`
+	Uint32Hex uint32 `default:"0x20"`
+	Uint64Hex uint64 `default:"0x40"`
+
+	IntBin    int    `default:"0b1"`
+	Int8Bin   int8   `default:"0b1000"`
+	Int16Bin  int16  `default:"0b10000"`
+	Int32Bin  int32  `default:"0b100000"`
+	Int64Bin  int64  `default:"0b1000000"`
+	UintBin   uint   `default:"0b1"`
+	Uint8Bin  uint8  `default:"0b1000"`
+	Uint16Bin uint16 `default:"0b10000"`
+	Uint32Bin uint32 `default:"0b100000"`
+	Uint64Bin uint64 `default:"0b1000000"`
+
 	Struct    Struct         `default:"{}"`
 	StructPtr *Struct        `default:"{}"`
 	Map       map[string]int `default:"{}"`
@@ -182,6 +215,100 @@ func TestInit(t *testing.T) {
 		if sample.String != "hello" {
 			t.Errorf("it should initialize string")
 		}
+
+		if sample.IntOct != 0o1 {
+			t.Errorf("it should initialize int with octal literal")
+		}
+		if sample.Int8Oct != 0o10 {
+			t.Errorf("it should initialize int8 with octal literal")
+		}
+		if sample.Int16Oct != 0o20 {
+			t.Errorf("it should initialize int16 with octal literal")
+		}
+		if sample.Int32Oct != 0o40 {
+			t.Errorf("it should initialize int32 with octal literal")
+		}
+		if sample.Int64Oct != 0o100 {
+			t.Errorf("it should initialize int64 with octal literal")
+		}
+		if sample.UintOct != 0o1 {
+			t.Errorf("it should initialize uint with octal literal")
+		}
+		if sample.Uint8Oct != 0o10 {
+			t.Errorf("it should initialize uint8 with octal literal")
+		}
+		if sample.Uint16Oct != 0o20 {
+			t.Errorf("it should initialize uint16 with octal literal")
+		}
+		if sample.Uint32Oct != 0o40 {
+			t.Errorf("it should initialize uint32 with octal literal")
+		}
+		if sample.Uint64Oct != 0o100 {
+			t.Errorf("it should initialize uint64 with octal literal")
+		}
+
+		if sample.IntHex != 0x1 {
+			t.Errorf("it should initialize int with hexadecimal literal")
+		}
+		if sample.Int8Hex != 0x8 {
+			t.Errorf("it should initialize int8 with hexadecimal literal")
+		}
+		if sample.Int16Hex != 0x10 {
+			t.Errorf("it should initialize int16 with hexadecimal literal")
+		}
+		if sample.Int32Hex != 0x20 {
+			t.Errorf("it should initialize int32 with hexadecimal literal")
+		}
+		if sample.Int64Hex != 0x40 {
+			t.Errorf("it should initialize int64 with hexadecimal literal")
+		}
+		if sample.UintHex != 0x1 {
+			t.Errorf("it should initialize uint with hexadecimal literal")
+		}
+		if sample.Uint8Hex != 0x8 {
+			t.Errorf("it should initialize uint8 with hexadecimal literal")
+		}
+		if sample.Uint16Hex != 0x10 {
+			t.Errorf("it should initialize uint16 with hexadecimal literal")
+		}
+		if sample.Uint32Hex != 0x20 {
+			t.Errorf("it should initialize uint32 with hexadecimal literal")
+		}
+		if sample.Uint64Hex != 0x40 {
+			t.Errorf("it should initialize uint64 with hexadecimal literal")
+		}
+
+		if sample.IntBin != 0b1 {
+			t.Errorf("it should initialize int with binary literal")
+		}
+		if sample.Int8Bin != 0b1000 {
+			t.Errorf("it should initialize int8 with binary literal")
+		}
+		if sample.Int16Bin != 0b10000 {
+			t.Errorf("it should initialize int16 with binary literal")
+		}
+		if sample.Int32Bin != 0b100000 {
+			t.Errorf("it should initialize int32 with binary literal")
+		}
+		if sample.Int64Bin != 0b1000000 {
+			t.Errorf("it should initialize int64 with binary literal")
+		}
+		if sample.UintBin != 0b1 {
+			t.Errorf("it should initialize uint with binary literal")
+		}
+		if sample.Uint8Bin != 0b1000 {
+			t.Errorf("it should initialize uint8 with binary literal")
+		}
+		if sample.Uint16Bin != 0b10000 {
+			t.Errorf("it should initialize uint16 with binary literal")
+		}
+		if sample.Uint32Bin != 0b100000 {
+			t.Errorf("it should initialize uint32 with binary literal")
+		}
+		if sample.Uint64Bin != 0b1000000 {
+			t.Errorf("it should initialize uint64 with binary literal")
+		}
+
 	})
 
 	t.Run("complex types", func(t *testing.T) {
