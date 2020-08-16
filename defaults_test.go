@@ -142,6 +142,52 @@ type Emmbeded struct {
 	Int int `default:"1"`
 }
 
+func TestMustSet(t *testing.T) {
+
+	t.Run("right way", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Fatalf("it should not panic error: %v", err)
+			}
+		}()
+		sample := &Sample{
+			NonInitialString:            "string",
+			NonInitialSlice:             []int{1, 2, 3},
+			NonInitialStruct:            Struct{Foo: 123},
+			NonInitialStructPtr:         &Struct{Foo: 123},
+			DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+		}
+		MustSet(sample)
+	})
+
+	t.Run("not struct", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Logf("panic error: %v", err)
+			}
+		}()
+		var a int
+		MustSet(&a)
+	})
+
+	t.Run("not pointer", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Logf("panic error: %v", err)
+			}
+		}()
+		sample := Sample{
+			NonInitialString:            "string",
+			NonInitialSlice:             []int{1, 2, 3},
+			NonInitialStruct:            Struct{Foo: 123},
+			NonInitialStructPtr:         &Struct{Foo: 123},
+			DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+		}
+		MustSet(sample)
+	})
+
+}
+
 func TestInit(t *testing.T) {
 	sample := &Sample{
 		NonInitialString:            "string",
