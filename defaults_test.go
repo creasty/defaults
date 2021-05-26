@@ -44,10 +44,12 @@ type Sample struct {
 	Float64   float64       `default:"1.64"`
 	BoolTrue  bool          `default:"true"`
 	BoolFalse bool          `default:"false"`
+	BoolPtr   *bool         `default:"true"`
 	String    string        `default:"hello"`
 	Duration  time.Duration `default:"10s"`
 
 	IntOct    int    `default:"0o1"`
+	IntOctPtr *int   `default:"0o1"`
 	Int8Oct   int8   `default:"0o10"`
 	Int16Oct  int16  `default:"0o20"`
 	Int32Oct  int32  `default:"0o40"`
@@ -258,11 +260,17 @@ func TestInit(t *testing.T) {
 		if sample.BoolFalse != false {
 			t.Errorf("it should initialize bool (false)")
 		}
+		if *sample.BoolPtr == true {
+			t.Errorf("it should initialize bool (true)")
+		}
 		if sample.String != "hello" {
 			t.Errorf("it should initialize string")
 		}
 
 		if sample.IntOct != 0o1 {
+			t.Errorf("it should initialize int with octal literal")
+		}
+		if *sample.IntOctPtr != 0o1 {
 			t.Errorf("it should initialize int with octal literal")
 		}
 		if sample.Int8Oct != 0o10 {
@@ -577,6 +585,22 @@ func TestPointerStructMember(t *testing.T) {
 	Set(&m)
 	if m.Child.Age != 20 {
 		t.Errorf("20 is expected")
+	}
+}
+
+func TestPointerNonStructMember(t *testing.T) {
+	falseVal := false
+	intVal := 10
+	m := Sample{
+		IntOctPtr: &intVal,
+		BoolPtr:   &falseVal,
+	}
+	Set(&m)
+	if *m.BoolPtr != false {
+		t.Errorf("BoolPtr with valid value should not be modified by Set")
+	}
+	if *m.IntOctPtr != 10 {
+		t.Errorf("IntOctPtr with valid value should not be modified by Set")
 	}
 }
 
