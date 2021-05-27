@@ -260,7 +260,7 @@ func TestInit(t *testing.T) {
 		if sample.BoolFalse != false {
 			t.Errorf("it should initialize bool (false)")
 		}
-		if *sample.BoolPtr == true {
+		if *sample.BoolPtr != true {
 			t.Errorf("it should initialize bool (true)")
 		}
 		if sample.String != "hello" {
@@ -595,7 +595,7 @@ func TestPointerNonStructMember(t *testing.T) {
 		IntOctPtr: &intVal,
 		BoolPtr:   &falseVal,
 	}
-	Set(&m)
+	MustSet(&m)
 	if *m.BoolPtr != false {
 		t.Errorf("BoolPtr with valid value should not be modified by Set")
 	}
