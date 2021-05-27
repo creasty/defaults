@@ -59,7 +59,9 @@ func setField(field reflect.Value, defaultVal string) error {
 		return nil
 	}
 
+	defaultValueSet := false
 	if isInitialValue(field) {
+		defaultValueSet = true
 		switch field.Kind() {
 		case reflect.Bool:
 			if val, err := strconv.ParseBool(defaultVal); err == nil {
@@ -153,8 +155,10 @@ func setField(field reflect.Value, defaultVal string) error {
 
 	switch field.Kind() {
 	case reflect.Ptr:
-		setField(field.Elem(), defaultVal)
-		callSetter(field.Interface())
+		if defaultValueSet || field.Elem().Kind() == reflect.Struct {
+			setField(field.Elem(), defaultVal)
+			callSetter(field.Interface())
+		}
 	case reflect.Struct:
 		if err := Set(field.Addr().Interface()); err != nil {
 			return err
