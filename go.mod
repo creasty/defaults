@@ -1,3 +1,3 @@
-module github.com/creasty/defaults
+module github.com/24metrics/defaults
 
 go 1.13
