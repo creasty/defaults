@@ -44,12 +44,10 @@ type Sample struct {
 	Float64   float64       `default:"1.64"`
 	BoolTrue  bool          `default:"true"`
 	BoolFalse bool          `default:"false"`
-	BoolPtr   *bool         `default:"true"`
 	String    string        `default:"hello"`
 	Duration  time.Duration `default:"10s"`
 
 	IntOct    int    `default:"0o1"`
-	IntOctPtr *int   `default:"0o1"`
 	Int8Oct   int8   `default:"0o10"`
 	Int16Oct  int16  `default:"0o20"`
 	Int32Oct  int32  `default:"0o40"`
@@ -82,10 +80,18 @@ type Sample struct {
 	Uint32Bin uint32 `default:"0b100000"`
 	Uint64Bin uint64 `default:"0b1000000"`
 
-	Struct    Struct         `default:"{}"`
-	StructPtr *Struct        `default:"{}"`
-	Map       map[string]int `default:"{}"`
-	Slice     []string       `default:"[]"`
+	Struct Struct         `default:"{}"`
+	Map    map[string]int `default:"{}"`
+	Slice  []string       `default:"[]"`
+
+	IntPtr     *int            `default:"1"`
+	UintPtr    *uint           `default:"1"`
+	Float32Ptr *float32        `default:"1"`
+	BoolPtr    *bool           `default:"true"`
+	StringPtr  *string         `default:"hello"`
+	StructPtr  *Struct         `default:"{}"`
+	MapPtr     *map[string]int `default:"{}"`
+	SlicePtr   *[]string       `default:"[]"`
 
 	MyInt       MyInt     `default:"1"`
 	MyInt8      MyInt8    `default:"8"`
@@ -116,11 +122,11 @@ type Sample struct {
 	NoDefault       *string `default:"-"`
 	NoDefaultStruct Struct  `default:"-"`
 
-	MapWithNoTag                map[string]int
-	SliceWithNoTag              []string
-	StructPtrWithNoTag          *Struct
-	StructWithNoTag             Struct
-	DeepSliceOfStructsWithNoTag [][][]Struct
+	MapWithNoTag               map[string]int
+	SliceWithNoTag             []string
+	StructPtrWithNoTag         *Struct
+	StructWithNoTag            Struct
+	DeepSliceOfStructWithNoTag [][][]Struct
 
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
@@ -129,7 +135,7 @@ type Sample struct {
 }
 
 type Struct struct {
-	Emmbeded `default:"{}"`
+	Embedded `default:"{}"`
 
 	Foo         int
 	Bar         int
@@ -140,7 +146,7 @@ func (s *Struct) SetDefaults() {
 	s.Bar = 456
 }
 
-type Emmbeded struct {
+type Embedded struct {
 	Int int `default:"1"`
 }
 
@@ -153,11 +159,11 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := &Sample{
-			NonInitialString:            "string",
-			NonInitialSlice:             []int{1, 2, 3},
-			NonInitialStruct:            Struct{Foo: 123},
-			NonInitialStructPtr:         &Struct{Foo: 123},
-			DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+			NonInitialString:           "string",
+			NonInitialSlice:            []int{1, 2, 3},
+			NonInitialStruct:           Struct{Foo: 123},
+			NonInitialStructPtr:        &Struct{Foo: 123},
+			DeepSliceOfStructWithNoTag: [][][]Struct{{{{Foo: 123}}}},
 		}
 		MustSet(sample)
 	})
@@ -179,11 +185,11 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := Sample{
-			NonInitialString:            "string",
-			NonInitialSlice:             []int{1, 2, 3},
-			NonInitialStruct:            Struct{Foo: 123},
-			NonInitialStructPtr:         &Struct{Foo: 123},
-			DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+			NonInitialString:           "string",
+			NonInitialSlice:            []int{1, 2, 3},
+			NonInitialStruct:           Struct{Foo: 123},
+			NonInitialStructPtr:        &Struct{Foo: 123},
+			DeepSliceOfStructWithNoTag: [][][]Struct{{{{Foo: 123}}}},
 		}
 		MustSet(sample)
 	})
@@ -192,11 +198,11 @@ func TestMustSet(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	sample := &Sample{
-		NonInitialString:            "string",
-		NonInitialSlice:             []int{1, 2, 3},
-		NonInitialStruct:            Struct{Foo: 123},
-		NonInitialStructPtr:         &Struct{Foo: 123},
-		DeepSliceOfStructsWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+		NonInitialString:           "string",
+		NonInitialSlice:            []int{1, 2, 3},
+		NonInitialStruct:           Struct{Foo: 123},
+		NonInitialStructPtr:        &Struct{Foo: 123},
+		DeepSliceOfStructWithNoTag: [][][]Struct{{{{Foo: 123}}}},
 	}
 
 	if err := Set(sample); err != nil {
@@ -214,7 +220,7 @@ func TestInit(t *testing.T) {
 
 	Set(&fixture.Sample{}) // should not panic
 
-	t.Run("scalar types", func(t *testing.T) {
+	t.Run("primitive types", func(t *testing.T) {
 		if sample.Int != 1 {
 			t.Errorf("it should initialize int")
 		}
@@ -268,9 +274,6 @@ func TestInit(t *testing.T) {
 		}
 
 		if sample.IntOct != 0o1 {
-			t.Errorf("it should initialize int with octal literal")
-		}
-		if *sample.IntOctPtr != 0o1 {
 			t.Errorf("it should initialize int with octal literal")
 		}
 		if sample.Int8Oct != 0o10 {
@@ -362,7 +365,6 @@ func TestInit(t *testing.T) {
 		if sample.Uint64Bin != 0b1000000 {
 			t.Errorf("it should initialize uint64 with binary literal")
 		}
-
 	})
 
 	t.Run("complex types", func(t *testing.T) {
@@ -374,6 +376,30 @@ func TestInit(t *testing.T) {
 		}
 		if sample.Slice == nil {
 			t.Errorf("it should initialize slice")
+		}
+	})
+
+	t.Run("pointer types", func(t *testing.T) {
+		if sample.IntPtr == nil || *sample.IntPtr != 1 {
+			t.Errorf("it should initialize int pointer")
+		}
+		if sample.UintPtr == nil || *sample.UintPtr != 1 {
+			t.Errorf("it should initialize uint pointer")
+		}
+		if sample.Float32Ptr == nil || *sample.Float32Ptr != 1 {
+			t.Errorf("it should initialize float32 pointer")
+		}
+		if sample.BoolPtr == nil || *sample.BoolPtr != true {
+			t.Errorf("it should initialize bool pointer")
+		}
+		if sample.StringPtr == nil || *sample.StringPtr != "hello" {
+			t.Errorf("it should initialize string pointer")
+		}
+		if sample.MapPtr == nil {
+			t.Errorf("it should initialize map ptr")
+		}
+		if sample.SlicePtr == nil {
+			t.Errorf("it should initialize slice ptr")
 		}
 	})
 
@@ -442,8 +468,8 @@ func TestInit(t *testing.T) {
 		if sample.StructPtr == nil || sample.StructPtr.WithDefault != "foo" {
 			t.Errorf("it should set default on inner field in struct pointer")
 		}
-		if sample.Struct.Emmbeded.Int != 1 {
-			t.Errorf("it should set default on an emmbeded struct")
+		if sample.Struct.Embedded.Int != 1 {
+			t.Errorf("it should set default on an Embedded struct")
 		}
 	})
 
@@ -508,10 +534,10 @@ func TestInit(t *testing.T) {
 		if !reflect.DeepEqual(sample.NonInitialSlice, []int{1, 2, 3}) {
 			t.Errorf("it should not override non-initial value")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
+		if !reflect.DeepEqual(sample.NonInitialStruct, Struct{Embedded: Embedded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
 			t.Errorf("it should not override non-initial value but set defaults for fields")
 		}
-		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
+		if !reflect.DeepEqual(sample.NonInitialStructPtr, &Struct{Embedded: Embedded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}) {
 			t.Errorf("it should not override non-initial value but set defaults for fields")
 		}
 	})
@@ -529,7 +555,7 @@ func TestInit(t *testing.T) {
 		if sample.StructWithNoTag.WithDefault != "foo" {
 			t.Errorf("it should automatically recurse into a struct even without a tag")
 		}
-		if !reflect.DeepEqual(sample.DeepSliceOfStructsWithNoTag, [][][]Struct{{{{Emmbeded: Emmbeded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}}}}) {
+		if !reflect.DeepEqual(sample.DeepSliceOfStructWithNoTag, [][][]Struct{{{{Embedded: Embedded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}}}}) {
 			t.Errorf("it should automatically recurse into a slice of structs even without a tag")
 		}
 	})
@@ -585,22 +611,6 @@ func TestPointerStructMember(t *testing.T) {
 	Set(&m)
 	if m.Child.Age != 20 {
 		t.Errorf("20 is expected")
-	}
-}
-
-func TestPointerNonStructMember(t *testing.T) {
-	falseVal := false
-	intVal := 10
-	m := Sample{
-		IntOctPtr: &intVal,
-		BoolPtr:   &falseVal,
-	}
-	MustSet(&m)
-	if *m.BoolPtr != false {
-		t.Errorf("BoolPtr with valid value should not be modified by Set")
-	}
-	if *m.IntOctPtr != 10 {
-		t.Errorf("IntOctPtr with valid value should not be modified by Set")
 	}
 }
 
