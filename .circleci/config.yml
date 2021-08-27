@@ -17,6 +17,7 @@ jobs:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+      - run: go get -u golang.org/x/lint/golint
       - run:
           name: Run tests
           command: make ci-test
