@@ -168,6 +168,24 @@ func setField(field reflect.Value, defaultVal string) error {
 				return err
 			}
 		}
+	case reflect.Map:
+		for _, e := range field.MapKeys() {
+			var ele interface{}
+			switch e.Kind() {
+			case reflect.Ptr:
+				ele = field.MapIndex(e).Elem().Interface()
+			default:
+				ele = field.MapIndex(e).Interface()
+			}
+			p := reflect.New(reflect.TypeOf(ele))
+			p.Elem().Set(reflect.ValueOf(ele))
+			err := Set(p.Interface())
+			if err == nil || err == errInvalidType {
+				field.SetMapIndex(e, reflect.ValueOf(p.Elem().Interface()))
+			} else {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -186,6 +204,8 @@ func shouldInitializeField(field reflect.Value, tag string) bool {
 			return true
 		}
 	case reflect.Slice:
+		return field.Len() > 0 || tag != ""
+	case reflect.Map:
 		return field.Len() > 0 || tag != ""
 	}
 

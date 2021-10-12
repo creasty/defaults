@@ -112,10 +112,13 @@ type Sample struct {
 	MyMap       MyMap     `default:"{}"`
 	MySlice     MySlice   `default:"[]"`
 
-	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
-	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
-	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
-	SliceWithJSON     []string       `default:"[\"foo\"]"`
+	StructWithJSON     Struct         `default:"{\"Foo\": 123}"`
+	StructPtrWithJSON  *Struct        `default:"{\"Foo\": 123}"`
+	MapWithJSON        map[string]int `default:"{\"foo\": 123}"`
+	MapOfStruct        map[string]Struct
+	MapOfPtrStruct     map[string]*Struct
+	MapOfStructWithTag map[string]Struct `default:"{\"Struct3\": {\"Foo\":123}}"`
+	SliceWithJSON      []string          `default:"[\"foo\"]"`
 
 	Empty string `default:""`
 
@@ -203,6 +206,13 @@ func TestInit(t *testing.T) {
 		NonInitialStruct:           Struct{Foo: 123},
 		NonInitialStructPtr:        &Struct{Foo: 123},
 		DeepSliceOfStructWithNoTag: [][][]Struct{{{{Foo: 123}}}},
+		MapOfStruct: map[string]Struct{
+			"Struct1": {Foo: 1},
+		},
+		MapOfPtrStruct: map[string]*Struct{
+			"Struct1": {Foo: 1},
+			"Struct2": {Bar: 5},
+		},
 	}
 
 	if err := Set(sample); err != nil {
@@ -557,6 +567,69 @@ func TestInit(t *testing.T) {
 		}
 		if !reflect.DeepEqual(sample.DeepSliceOfStructWithNoTag, [][][]Struct{{{{Embedded: Embedded{Int: 1}, Foo: 123, Bar: 456, WithDefault: "foo"}}}}) {
 			t.Errorf("it should automatically recurse into a slice of structs even without a tag")
+		}
+	})
+
+	t.Run("map of struct", func(t *testing.T) {
+		if sample.MapOfStruct == nil {
+			t.Errorf("it should not unset an initiated map")
+		}
+		if len(sample.MapOfStruct) != 1 {
+			t.Errorf("it should not override an initiated map")
+		}
+		if sample.MapOfStruct["Struct1"].Foo != 1 {
+			t.Errorf("it should not override Foo field in Struct1 item")
+		}
+		if sample.MapOfStruct["Struct1"].Bar != 456 {
+			t.Errorf("it should set default for Bar field in Struct1 item")
+		}
+		if sample.MapOfStruct["Struct1"].WithDefault != "foo" {
+			t.Errorf("it should set default for WithDefault field in Struct1 item")
+		}
+	})
+
+	t.Run("map of ptr struct", func(t *testing.T) {
+		if sample.MapOfPtrStruct == nil {
+			t.Errorf("it should not unset an initiated map")
+		}
+		if len(sample.MapOfPtrStruct) != 2 {
+			t.Errorf("it should not override an initiated map")
+		}
+		if sample.MapOfPtrStruct["Struct1"].Foo != 1 {
+			t.Errorf("it should not override Foo field in Struct1 item")
+		}
+		if sample.MapOfPtrStruct["Struct1"].Bar != 456 {
+			t.Errorf("it should set default for Bar field in Struct1 item")
+		}
+		if sample.MapOfPtrStruct["Struct1"].WithDefault != "foo" {
+			t.Errorf("it should set default for WithDefault field in Struct1 item")
+		}
+		if sample.MapOfPtrStruct["Struct2"].Foo != 1 {
+			t.Errorf("it should not override Foo field in Struct2 item")
+		}
+		if sample.MapOfPtrStruct["Struct2"].Bar != 5 {
+			t.Errorf("it should not set default for Bar field in a Struct2 item")
+		}
+		if sample.MapOfPtrStruct["Struct2"].WithDefault != "foo" {
+			t.Errorf("it should set default for WithDefault field in Struct2 item")
+		}
+	})
+
+	t.Run("map of struct with tag", func(t *testing.T) {
+		if sample.MapOfStructWithTag == nil {
+			t.Errorf("it should set default")
+		}
+		if len(sample.MapOfStructWithTag) != 1 {
+			t.Errorf("it should set default with correct value")
+		}
+		if sample.MapOfStructWithTag["Struct3"].Foo != 123 {
+			t.Errorf("it should set default with correct value (Foo)")
+		}
+		if sample.MapOfStructWithTag["Struct1"].Bar != 0 {
+			t.Errorf("it should set default with correct value (Bar)")
+		}
+		if sample.MapOfStructWithTag["Struct1"].WithDefault != "" {
+			t.Errorf("it should set default with correct value (WithDefault)")
 		}
 	})
 
