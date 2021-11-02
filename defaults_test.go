@@ -29,11 +29,6 @@ type (
 )
 
 type Sample struct {
-	MapOfPtrStruct map[string]*Struct
-	MapOfStruct    map[string]Struct
-
-	MapOfStructWithTag map[string]Struct `default:"{\"Struct3\": {\"Foo\":123}}"`
-
 	Int       int           `default:"1"`
 	Int8      int8          `default:"8"`
 	Int16     int16         `default:"16"`
@@ -120,6 +115,10 @@ type Sample struct {
 	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
 	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
 	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
+
+	MapOfPtrStruct     map[string]*Struct
+	MapOfStruct        map[string]Struct
+	MapOfStructWithTag map[string]Struct `default:"{\"Struct3\": {\"Foo\":123}}"`
 
 	SliceWithJSON []string `default:"[\"foo\"]"`
 
