@@ -29,6 +29,11 @@ type (
 )
 
 type Sample struct {
+	MapOfPtrStruct map[string]*Struct
+	MapOfStruct    map[string]Struct
+
+	MapOfStructWithTag map[string]Struct `default:"{\"Struct3\": {\"Foo\":123}}"`
+
 	Int       int           `default:"1"`
 	Int8      int8          `default:"8"`
 	Int16     int16         `default:"16"`
@@ -112,13 +117,11 @@ type Sample struct {
 	MyMap       MyMap     `default:"{}"`
 	MySlice     MySlice   `default:"[]"`
 
-	StructWithJSON     Struct         `default:"{\"Foo\": 123}"`
-	StructPtrWithJSON  *Struct        `default:"{\"Foo\": 123}"`
-	MapWithJSON        map[string]int `default:"{\"foo\": 123}"`
-	MapOfStruct        map[string]Struct
-	MapOfPtrStruct     map[string]*Struct
-	MapOfStructWithTag map[string]Struct `default:"{\"Struct3\": {\"Foo\":123}}"`
-	SliceWithJSON      []string          `default:"[\"foo\"]"`
+	StructWithJSON    Struct         `default:"{\"Foo\": 123}"`
+	StructPtrWithJSON *Struct        `default:"{\"Foo\": 123}"`
+	MapWithJSON       map[string]int `default:"{\"foo\": 123}"`
+
+	SliceWithJSON []string `default:"[\"foo\"]"`
 
 	Empty string `default:""`
 
@@ -604,11 +607,11 @@ func TestInit(t *testing.T) {
 		if sample.MapOfPtrStruct["Struct1"].WithDefault != "foo" {
 			t.Errorf("it should set default for WithDefault field in Struct1 item")
 		}
-		if sample.MapOfPtrStruct["Struct2"].Foo != 1 {
+		if sample.MapOfPtrStruct["Struct2"].Foo != 0 {
 			t.Errorf("it should not override Foo field in Struct2 item")
 		}
-		if sample.MapOfPtrStruct["Struct2"].Bar != 5 {
-			t.Errorf("it should not set default for Bar field in a Struct2 item")
+		if sample.MapOfPtrStruct["Struct2"].Bar != 456 {
+			t.Errorf("it should using setter to set default for Bar field in a Struct2 item")
 		}
 		if sample.MapOfPtrStruct["Struct2"].WithDefault != "foo" {
 			t.Errorf("it should set default for WithDefault field in Struct2 item")
