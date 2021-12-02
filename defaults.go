@@ -13,7 +13,7 @@ var (
 )
 
 const (
-	fieldName = "default"
+	fieldName = "field_default"
 )
 
 // Set initializes members in a struct referenced by a pointer.
