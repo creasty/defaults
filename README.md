@@ -14,6 +14,8 @@ Initialize structs with default values
     - `uintptr`, `bool`, `string`
   - Complex types
     - `map`, `slice`, `struct`
+  - Nested types
+    - `map[K1]map[K2]Struct`, `[]map[K1]Struct[]`
   - Aliased types
     - `time.Duration`
     - e.g., `type Enum string`
