@@ -37,9 +37,13 @@ type Sample struct {
 
 	Slice       []string       `default:"[]"`
 	SliceByJSON []int          `default:"[1, 2, 3]"` // Supports JSON
-	Map         map[string]int `default:"{}"`
-	MapByJSON   map[string]int `default:"{\"foo\": 123}"`
 
+	Map                 map[string]int `default:"{}"`
+	MapByJSON           map[string]int `default:"{\"foo\": 123}"`
+	MapOfStruct         map[string]OtherStruct
+	MapOfPtrStruct      map[string]*OtherStruct
+	MapOfStructWithTag  map[string]OtherStruct `default:"{\"Key1\": {\"Foo\":123}}"`
+    
 	Struct    OtherStruct  `default:"{}"`
 	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
 
