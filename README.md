@@ -30,27 +30,39 @@ Usage
 -----
 
 ```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"math/rand"
+
+	"github.com/creasty/defaults"
+)
+
 type Gender string
 
 type Sample struct {
-	Name   string `default:"John Smith"`
-	Age    int    `default:"27"`
-	Gender Gender `default:"m"`
+	Name    string `default:"John Smith"`
+	Age     int    `default:"27"`
+	Gender  Gender `default:"m"`
+	Working bool   `default:"true"`
 
-	Slice       []string       `default:"[]"`
-	SliceByJSON []int          `default:"[1, 2, 3]"` // Supports JSON
+	SliceInt    []int    `default:"[1, 2, 3]"`
+	SlicePtr    []*int   `default:"[1, 2, 3]"`
+	SliceString []string `default:"[\"a\", \"b\"]"`
 
-	Map                 map[string]int `default:"{}"`
-	MapByJSON           map[string]int `default:"{\"foo\": 123}"`
-	MapOfStruct         map[string]OtherStruct
-	MapOfPtrStruct      map[string]*OtherStruct
-	MapOfStructWithTag  map[string]OtherStruct `default:"{\"Key1\": {\"Foo\":123}}"`
-    
-	Struct    OtherStruct  `default:"{}"`
+	MapNull            map[string]int          `default:"{}"`
+	Map                map[string]int          `default:"{\"key1\": 123}"`
+	MapOfStruct        map[string]OtherStruct  `default:"{\"Key2\": {\"Foo\":123}}"`
+	MapOfPtrStruct     map[string]*OtherStruct `default:"{\"Key3\": {\"Foo\":123}}"`
+	MapOfStructWithTag map[string]OtherStruct  `default:"{\"Key4\": {\"Foo\":123}}"`
+
+	Struct    OtherStruct  `default:"{\"Foo\": 123}"`
 	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
 
-	NoTag  OtherStruct               // Recurses into a nested struct by default
-	OptOut OtherStruct `default:"-"` // Opt-out
+	NoTag    OtherStruct // Recurses into a nested struct by default
+	NoOption OtherStruct `default:"-"` // no option
 }
 
 type OtherStruct struct {
@@ -65,11 +77,84 @@ func (s *OtherStruct) SetDefaults() {
 		s.Random = rand.Int() // Set a dynamic value
 	}
 }
-```
 
-```go
-obj := &Sample{}
-if err := defaults.Set(obj); err != nil {
-	panic(err)
+func main() {
+	obj := &Sample{}
+	if err := defaults.Set(obj); err != nil {
+		panic(err)
+	}
+
+	out, err := json.MarshalIndent(obj, "", "	")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(out))
+
+	// Output:
+	// {
+	// 	"Name": "John Smith",
+	// 	"Age": 27,
+	// 	"Gender": "m",
+	// 	"Working": true,
+	// 	"SliceInt": [
+	// 		1,
+	// 		2,
+	// 		3
+	// 	],
+	// 	"SlicePtr": [
+	// 		1,
+	// 		2,
+	// 		3
+	// 	],
+	// 	"SliceString": [
+	// 		"a",
+	// 		"b"
+	// 	],
+	// 	"MapNull": {},
+	// 	"Map": {
+	// 		"key1": 123
+	// 	},
+	// 	"MapOfStruct": {
+	// 		"Key2": {
+	// 			"Hello": "world",
+	// 			"Foo": 123,
+	// 			"Random": 5577006791947779410
+	// 		}
+	// 	},
+	// 	"MapOfPtrStruct": {
+	// 		"Key3": {
+	// 			"Hello": "world",
+	// 			"Foo": 123,
+	// 			"Random": 8674665223082153551
+	// 		}
+	// 	},
+	// 	"MapOfStructWithTag": {
+	// 		"Key4": {
+	// 			"Hello": "world",
+	// 			"Foo": 123,
+	// 			"Random": 6129484611666145821
+	// 		}
+	// 	},
+	// 	"Struct": {
+	// 		"Hello": "world",
+	// 		"Foo": 123,
+	// 		"Random": 4037200794235010051
+	// 	},
+	// 	"StructPtr": {
+	// 		"Hello": "world",
+	// 		"Foo": 123,
+	// 		"Random": 3916589616287113937
+	// 	},
+	// 	"NoTag": {
+	// 		"Hello": "world",
+	// 		"Foo": 0,
+	// 		"Random": 6334824724549167320
+	// 	},
+	// 	"NoOption": {
+	// 		"Hello": "",
+	// 		"Foo": 0,
+	// 		"Random": 0
+	// 	}
+	// }
 }
 ```
