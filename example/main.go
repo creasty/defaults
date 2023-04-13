@@ -1,35 +1,3 @@
-defaults
-========
-
-[![CircleCI](https://circleci.com/gh/creasty/defaults/tree/master.svg?style=svg)](https://circleci.com/gh/creasty/defaults/tree/master)
-[![codecov](https://codecov.io/gh/creasty/defaults/branch/master/graph/badge.svg)](https://codecov.io/gh/creasty/defaults)
-[![GitHub release](https://img.shields.io/github/release/creasty/defaults.svg)](https://github.com/creasty/defaults/releases)
-[![License](https://img.shields.io/github/license/creasty/defaults.svg)](./LICENSE)
-
-Initialize structs with default values
-
-- Supports almost all kind of types
-  - Scalar types
-    - `int/8/16/32/64`, `uint/8/16/32/64`, `float32/64`
-    - `uintptr`, `bool`, `string`
-  - Complex types
-    - `map`, `slice`, `struct`
-  - Nested types
-    - `map[K1]map[K2]Struct`, `[]map[K1]Struct[]`
-  - Aliased types
-    - `time.Duration`
-    - e.g., `type Enum string`
-  - Pointer types
-    - e.g., `*SampleStruct`, `*int`
-- Recursively initializes fields in a struct
-- Dynamically sets default values by [`defaults.Setter`](./setter.go) interface
-- Preserves non-initial values from being reset with a default value
-
-
-Usage
------
-
-```go
 package main
 
 import (
@@ -157,4 +125,3 @@ func main() {
 	// 	}
 	// }
 }
-```
