@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -755,5 +756,46 @@ func TestDefaultsSetter(t *testing.T) {
 	}
 	if main.MainInt != 1 {
 		t.Errorf("expected 1 for MainInt, got %d", main.MainInt)
+	}
+}
+
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) SetTaggedDefaults(tag string) (err error) {
+	d.Duration, err = time.ParseDuration(tag)
+	return
+}
+
+type TaggedDefaults struct {
+	Duration Duration `default:"1s"`
+}
+
+func TestTaggedDefaultsSetterHappy(t *testing.T) {
+	sample := &TaggedDefaults{}
+	err := Set(sample)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+
+	if sample.Duration.Duration != time.Second {
+		t.Errorf("expected 1s for Duration, got %s", sample.Duration.Duration)
+	}
+}
+
+type TaggedDefaultsSad struct {
+	Duration Duration `default:"invalid"`
+}
+
+func TestTaggedDefaultsSetterSad(t *testing.T) {
+	sample := &TaggedDefaultsSad{}
+	err := Set(sample)
+	if err == nil {
+		t.Error("unexpected success?!")
+	}
+
+	if !strings.HasPrefix(err.Error(), "time: invalid duration") {
+		t.Errorf("unexpected error: %s", err)
 	}
 }

@@ -10,3 +10,14 @@ func callSetter(v interface{}) {
 		ds.SetDefaults()
 	}
 }
+
+type TaggedSetter interface {
+	SetTaggedDefaults(tag string) error
+}
+
+func callTaggedSetter(v interface{}, tag string) error {
+	if ds, ok := v.(TaggedSetter); ok {
+		return ds.SetTaggedDefaults(tag)
+	}
+	return nil
+}
