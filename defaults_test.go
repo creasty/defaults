@@ -144,6 +144,9 @@ type Sample struct {
 	NonInitialSlice     []int   `default:"[123]"`
 	NonInitialStruct    Struct  `default:"{}"`
 	NonInitialStructPtr *Struct `default:"{}"`
+
+	StructSliceWithEmptyDefaultElem  []Struct `default:"[{}]"`
+	StructSliceWithFilledDefaultElem []Struct `default:"[{\"WithDefault\":\"changed\"}]"`
 }
 
 type Struct struct {
@@ -678,6 +681,15 @@ func TestInit(t *testing.T) {
 		}
 		if sample.NoDefaultStruct.WithDefault != "" {
 			t.Errorf("it should not initialize a struct with default values")
+		}
+	})
+
+	t.Run("slice of structs", func(t *testing.T) {
+		if !reflect.DeepEqual(sample.StructSliceWithEmptyDefaultElem, []Struct{{Embedded: Embedded{Int: 1}, Foo: 0, Bar: 456, WithDefault: "foo"}}) {
+			t.Errorf("it should automatically fill a slice of structs with elements from default")
+		}
+		if !reflect.DeepEqual(sample.StructSliceWithFilledDefaultElem, []Struct{{Embedded: Embedded{Int: 1}, Foo: 0, Bar: 456, WithDefault: "changed"}}) {
+			t.Errorf("it should overwrite child's default with parent's")
 		}
 	})
 }
