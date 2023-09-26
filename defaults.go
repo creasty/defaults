@@ -169,7 +169,7 @@ func setField(field reflect.Value, defaultVal string) error {
 		}
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			if err := setField(field.Index(j), defaultVal); err != nil {
+			if err := setField(field.Index(j), ""); err != nil {
 				return err
 			}
 		}
