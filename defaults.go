@@ -1,4 +1,4 @@
-package defaults
+package moredefaults
 
 import (
 	"encoding"
@@ -11,16 +11,19 @@ import (
 
 var (
 	errInvalidType = errors.New("not a struct pointer")
-)
-
-const (
-	fieldName = "default"
+	errInvalidName = errors.New("should pass only one name")
+	fieldName      = "default"
 )
 
 // Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
-func Set(ptr interface{}) error {
+func Set(ptr interface{}, name ...string) error {
+	if len(name) == 1 {
+		fieldName = name[0]
+	} else if len(name) > 1 {
+		return errInvalidName
+	}
 	if reflect.TypeOf(ptr).Kind() != reflect.Ptr {
 		return errInvalidType
 	}
@@ -45,8 +48,8 @@ func Set(ptr interface{}) error {
 
 // MustSet function is a wrapper of Set function
 // It will call Set and panic if err not equals nil.
-func MustSet(ptr interface{}) {
-	if err := Set(ptr); err != nil {
+func MustSet(ptr interface{}, name ...string) {
+	if err := Set(ptr, name...); err != nil {
 		panic(err)
 	}
 }

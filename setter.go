@@ -1,4 +1,4 @@
-package defaults
+package moredefaults
 
 // Setter is an interface for setting default values
 type Setter interface {

@@ -1,3 +1,3 @@
-module github.com/creasty/defaults
+module github.com/taimoorgit/moredefaults
 
 go 1.14

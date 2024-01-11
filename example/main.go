@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/creasty/defaults"
+	"github.com/taimoorgit/moredefaults"
 )
 
 type Gender string
@@ -39,16 +39,16 @@ type OtherStruct struct {
 	Random int    `default:"-"`
 }
 
-// SetDefaults implements defaults.Setter interface
+// SetDefaults implements moredefaults.Setter interface
 func (s *OtherStruct) SetDefaults() {
-	if defaults.CanUpdate(s.Random) { // Check if it's a zero value (recommended)
+	if moredefaults.CanUpdate(s.Random) { // Check if it's a zero value (recommended)
 		s.Random = rand.Int() // Set a dynamic value
 	}
 }
 
 func main() {
 	obj := &Sample{}
-	if err := defaults.Set(obj); err != nil {
+	if err := moredefaults.Set(obj); err != nil {
 		panic(err)
 	}
 

@@ -1,4 +1,4 @@
-package defaults
+package moredefaults
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/creasty/defaults/internal/fixture"
+	"github.com/taimoorgit/moredefaults/internal/fixture"
 )
 
 type (
