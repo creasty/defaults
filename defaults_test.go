@@ -140,6 +140,7 @@ type Sample struct {
 	StructWithNoTag            Struct
 	DeepSliceOfStructWithNoTag [][][]Struct
 
+	NonInitialBool      bool    `default:"true"`
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
 	NonInitialStruct    Struct  `default:"{}"`
@@ -189,6 +190,7 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := &Sample{
+			NonInitialBool:             false,
 			NonInitialString:           "string",
 			NonInitialSlice:            []int{1, 2, 3},
 			NonInitialStruct:           Struct{Foo: 123},
@@ -215,6 +217,7 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := Sample{
+			NonInitialBool:             false,
 			NonInitialString:           "string",
 			NonInitialSlice:            []int{1, 2, 3},
 			NonInitialStruct:           Struct{Foo: 123},
@@ -228,6 +231,7 @@ func TestMustSet(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	sample := &Sample{
+		NonInitialBool:             false,
 		NonInitialString:           "string",
 		NonInitialSlice:            []int{1, 2, 3},
 		NonInitialStruct:           Struct{Foo: 123},
@@ -577,6 +581,9 @@ func TestInit(t *testing.T) {
 	})
 
 	t.Run("non-initial value", func(t *testing.T) {
+		if sample.NonInitialBool != false { // true is default; false is the non-initial value
+			t.Errorf("it should not override non-initial bool value")
+		}
 		if sample.NonInitialString != "string" {
 			t.Errorf("it should not override non-initial value")
 		}
