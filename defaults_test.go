@@ -229,6 +229,33 @@ func TestMustSet(t *testing.T) {
 
 }
 
+func TestOverrideDefaultTrueBoolToFalse(t *testing.T) {
+	type example struct {
+		BoolTrue        bool  `default:"true"`
+		BoolPointerTrue *bool `default:"true"`
+	}
+
+	e := &example{
+		BoolTrue:        false,
+		BoolPointerTrue: func() *bool { b := false; return &b }(), // lolsob
+	}
+
+	err := Set(e)
+	if err != nil {
+		t.Errorf("Set() should not return an error: %v", err)
+	}
+	t.Run("bool", func(t *testing.T) {
+		if e.BoolTrue == true {
+			t.Errorf("it should not override user-set false with the default of true")
+		}
+	})
+	t.Run("bool pointer", func(t *testing.T) {
+		if *e.BoolPointerTrue == true {
+			t.Errorf("it should not override user-set false with the default of true")
+		}
+	})
+}
+
 func TestInit(t *testing.T) {
 	sample := &Sample{
 		NonInitialBool:             false,
