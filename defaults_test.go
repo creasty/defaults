@@ -140,6 +140,7 @@ type Sample struct {
 	StructWithNoTag            Struct
 	DeepSliceOfStructWithNoTag [][][]Struct
 
+	NonInitialBool      bool    `default:"true"`
 	NonInitialString    string  `default:"foo"`
 	NonInitialSlice     []int   `default:"[123]"`
 	NonInitialStruct    Struct  `default:"{}"`
@@ -192,6 +193,7 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := &Sample{
+			NonInitialBool:             false,
 			NonInitialString:           "string",
 			NonInitialSlice:            []int{1, 2, 3},
 			NonInitialStruct:           Struct{Foo: 123},
@@ -218,6 +220,7 @@ func TestMustSet(t *testing.T) {
 			}
 		}()
 		sample := Sample{
+			NonInitialBool:             false,
 			NonInitialString:           "string",
 			NonInitialSlice:            []int{1, 2, 3},
 			NonInitialStruct:           Struct{Foo: 123},
@@ -229,8 +232,36 @@ func TestMustSet(t *testing.T) {
 
 }
 
+func TestOverrideDefaultTrueBoolToFalse(t *testing.T) {
+	type example struct {
+		BoolTrue        bool  `default:"true"`
+		BoolPointerTrue *bool `default:"true"`
+	}
+
+	e := &example{
+		BoolTrue:        false,
+		BoolPointerTrue: func() *bool { b := false; return &b }(), // lolsob
+	}
+
+	err := Set(e)
+	if err != nil {
+		t.Errorf("Set() should not return an error: %v", err)
+	}
+	t.Run("bool", func(t *testing.T) {
+		if e.BoolTrue == true {
+			t.Errorf("it should not override user-set false with the default of true")
+		}
+	})
+	t.Run("bool pointer", func(t *testing.T) {
+		if *e.BoolPointerTrue == true {
+			t.Errorf("it should not override user-set false with the default of true")
+		}
+	})
+}
+
 func TestInit(t *testing.T) {
 	sample := &Sample{
+		NonInitialBool:             false,
 		NonInitialString:           "string",
 		NonInitialSlice:            []int{1, 2, 3},
 		NonInitialStruct:           Struct{Foo: 123},
@@ -580,6 +611,9 @@ func TestInit(t *testing.T) {
 	})
 
 	t.Run("non-initial value", func(t *testing.T) {
+		if sample.NonInitialBool != false { // true is default; false is the non-initial value
+			t.Errorf("it should not override non-initial bool value")
+		}
 		if sample.NonInitialString != "string" {
 			t.Errorf("it should not override non-initial value")
 		}
