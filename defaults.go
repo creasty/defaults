@@ -34,6 +34,16 @@ func Set(ptr interface{}) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "-" {
+			if t.Field(i).IsExported() {
+				iface := v.Field(i).Addr().Interface()
+				if taggedSetter, ok := iface.(TaggedSetter); ok {
+					if err := taggedSetter.SetTaggedDefaults(defaultVal); err != nil {
+						return err
+					}
+					continue
+				}
+			}
+
 			if err := setField(v.Field(i), defaultVal); err != nil {
 				return err
 			}
