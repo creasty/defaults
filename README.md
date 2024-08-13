@@ -12,6 +12,7 @@ Initialize structs with default values
   - Scalar types
     - `int/8/16/32/64`, `uint/8/16/32/64`, `float32/64`
     - `uintptr`, `bool`, `string`
+      - `bool` values declared as a `*bool` allow for an unset boolean type. This helps distinguish the case where a default true bool is set to `false`.
   - Complex types
     - `map`, `slice`, `struct`
   - Nested types
@@ -46,7 +47,7 @@ type Sample struct {
 	Name    string `default:"John Smith"`
 	Age     int    `default:"27"`
 	Gender  Gender `default:"m"`
-	Working bool   `default:"true"`
+	Working *bool   `default:"true"`
 
 	SliceInt    []int    `default:"[1, 2, 3]"`
 	SlicePtr    []*int   `default:"[1, 2, 3]"`
