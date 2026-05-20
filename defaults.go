@@ -33,10 +33,13 @@ func Set(ptr interface{}) error {
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "-" {
-			if err := setField(v.Field(i), defaultVal); err != nil {
-				return err
-			}
+		defaultVal, ok := t.Field(i).Tag.Lookup(fieldName)
+		if ok && defaultVal == "-" {
+			continue
+		}
+
+		if err := setField(v.Field(i), defaultVal, ok); err != nil {
+			return err
 		}
 	}
 	callSetter(ptr)
@@ -51,12 +54,12 @@ func MustSet(ptr interface{}) {
 	}
 }
 
-func setField(field reflect.Value, defaultVal string) error {
+func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error {
 	if !field.CanSet() {
 		return nil
 	}
 
-	if !shouldInitializeField(field, defaultVal) {
+	if !shouldInitializeField(field, defaultVal, hasDefaultTag) {
 		return nil
 	}
 
@@ -160,7 +163,7 @@ func setField(field reflect.Value, defaultVal string) error {
 	switch field.Kind() {
 	case reflect.Ptr:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			setField(field.Elem(), defaultVal)
+			setField(field.Elem(), defaultVal, hasDefaultTag)
 			callSetter(field.Interface())
 		}
 	case reflect.Struct:
@@ -169,7 +172,7 @@ func setField(field reflect.Value, defaultVal string) error {
 		}
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			if err := setField(field.Index(j), ""); err != nil {
+			if err := setField(field.Index(j), "", false); err != nil {
 				return err
 			}
 		}
@@ -181,14 +184,14 @@ func setField(field reflect.Value, defaultVal string) error {
 			case reflect.Ptr:
 				switch v.Elem().Kind() {
 				case reflect.Struct, reflect.Slice, reflect.Map:
-					if err := setField(v.Elem(), ""); err != nil {
+					if err := setField(v.Elem(), "", false); err != nil {
 						return err
 					}
 				}
 			case reflect.Struct, reflect.Slice, reflect.Map:
 				ref := reflect.New(v.Type())
 				ref.Elem().Set(v)
-				if err := setField(ref.Elem(), ""); err != nil {
+				if err := setField(ref.Elem(), "", false); err != nil {
 					return err
 				}
 				field.SetMapIndex(e, ref.Elem().Convert(v.Type()))
@@ -221,7 +224,7 @@ func isInitialValue(field reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
 
-func shouldInitializeField(field reflect.Value, tag string) bool {
+func shouldInitializeField(field reflect.Value, tag string, hasDefaultTag bool) bool {
 	switch field.Kind() {
 	case reflect.Struct:
 		return true
@@ -235,7 +238,7 @@ func shouldInitializeField(field reflect.Value, tag string) bool {
 		return field.Len() > 0 || tag != ""
 	}
 
-	return tag != ""
+	return hasDefaultTag
 }
 
 // CanUpdate returns true when the given value is an initial value of its type

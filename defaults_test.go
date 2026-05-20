@@ -129,7 +129,8 @@ type Sample struct {
 
 	SliceWithJSON []string `default:"[\"foo\"]"`
 
-	Empty string `default:""`
+	Empty          string  `default:""`
+	EmptyStringPtr *string `default:""`
 
 	NoDefault       *string `default:"-"`
 	NoDefaultStruct Struct  `default:"-"`
@@ -311,6 +312,9 @@ func TestInit(t *testing.T) {
 		}
 		if sample.String != "hello" {
 			t.Errorf("it should initialize string")
+		}
+		if sample.EmptyStringPtr == nil || *sample.EmptyStringPtr != "" {
+			t.Errorf("it should initialize string pointer with empty default")
 		}
 
 		if sample.IntOct != 0o1 {
