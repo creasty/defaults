@@ -584,13 +584,13 @@ func TestInit(t *testing.T) {
 
 			if err := Set(&struct {
 				M map[string]*invalidNestedDefault
-			}{M: map[string]*invalidNestedDefault{"foo": &invalidNestedDefault{}}}); err == nil {
+			}{M: map[string]*invalidNestedDefault{"foo": {}}}); err == nil {
 				t.Errorf("it should return error")
 			}
 
 			if err := Set(&struct {
 				M map[string]invalidNestedDefault
-			}{M: map[string]invalidNestedDefault{"foo": invalidNestedDefault{}}}); err == nil {
+			}{M: map[string]invalidNestedDefault{"foo": {}}}); err == nil {
 				t.Errorf("it should return error")
 			}
 		})
