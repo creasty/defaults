@@ -571,6 +571,28 @@ func TestInit(t *testing.T) {
 			}{}); err == nil {
 				t.Errorf("it should return error")
 			}
+
+			type invalidNestedDefault struct {
+				I []int `default:"[!]"`
+			}
+
+			if err := Set(&struct {
+				S []invalidNestedDefault
+			}{S: []invalidNestedDefault{{}}}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				M map[string]*invalidNestedDefault
+			}{M: map[string]*invalidNestedDefault{"foo": &invalidNestedDefault{}}}); err == nil {
+				t.Errorf("it should return error")
+			}
+
+			if err := Set(&struct {
+				M map[string]invalidNestedDefault
+			}{M: map[string]invalidNestedDefault{"foo": invalidNestedDefault{}}}); err == nil {
+				t.Errorf("it should return error")
+			}
 		})
 	})
 
