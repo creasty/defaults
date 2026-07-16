@@ -1,6 +1,7 @@
 package defaults
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -698,6 +699,21 @@ func TestCanUpdate(t *testing.T) {
 	type st struct{ Int int }
 
 	var myStructPtr *st
+	var nilContext context.Context
+
+	for _, tt := range []struct {
+		name  string
+		input interface{}
+	}{
+		{name: "nil", input: nil},
+		{name: "nil context", input: nilContext},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if !CanUpdate(tt.input) {
+				t.Errorf("CanUpdate(%v) returns false, expected true", tt.input)
+			}
+		})
+	}
 
 	pairs := map[interface{}]bool{
 		0:            true,

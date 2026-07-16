@@ -218,6 +218,9 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) bool {
 }
 
 func isInitialValue(field reflect.Value) bool {
+	if !field.IsValid() {
+		return true
+	}
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
 
