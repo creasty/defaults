@@ -72,3 +72,50 @@ func TestSet_DurationStringOnANarrowerIntegerIsRejected(t *testing.T) {
 		require.Error(t, defaults.Set(&got))
 	})
 }
+
+// TestSet_DurationTagIsTrimmed covers a duration tag carrying surrounding whitespace, which used to
+// leave the field at zero. The trim happens where ParseDuration is attempted, so it covers every
+// int64-kinded field — including a named duration type, which a check against time.Duration's exact
+// type would miss.
+func TestSet_DurationTagIsTrimmed(t *testing.T) {
+	type myDuration time.Duration
+	type sample struct {
+		Duration time.Duration `default:" 10s "`
+		Named    myDuration    `default:" 10s "`
+		Int64    int64         `default:" 1h "`
+	}
+
+	var got sample
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Equal(t, 10*time.Second, got.Duration)
+	assert.Equal(t, myDuration(10*time.Second), got.Named, "a named duration type is covered too")
+	assert.Equal(t, int64(3600000000000), got.Int64, "an int64 takes a padded duration string, as it already took an unpadded one")
+}
+
+// TestSet_NumberTagIsNotTrimmed pins the other side of that trim: it belongs to the duration
+// attempt alone, so a padded number reaches the numeric parser exactly as written and is rejected.
+// It used to be ignored silently, leaving the field at zero.
+//
+// One field per subtest, because Set returns on the first error: a shared struct would leave the
+// second field unexercised.
+func TestSet_NumberTagIsNotTrimmed(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		got := struct {
+			V int `default:" 1 "`
+		}{}
+
+		require.ErrorContains(t, defaults.Set(&got), `field V: invalid default " 1 "`)
+		assert.Zero(t, got.V)
+	})
+
+	t.Run("int64", func(t *testing.T) {
+		got := struct {
+			V int64 `default:" 64 "`
+		}{}
+
+		require.ErrorContains(t, defaults.Set(&got), `field V: invalid default " 64 "`,
+			"the duration attempt trims, its numeric fallback does not")
+		assert.Zero(t, got.V)
+	})
+}
