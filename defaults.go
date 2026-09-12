@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +18,16 @@ var (
 const (
 	fieldName = "default"
 )
+
+// fieldTag is the `default` tag as it applies to one field: the field's name, for error messages,
+// the tag's value, and whether the tag was present at all — an empty value and an absent tag mean
+// different things. Grouping them keeps setField to one context parameter rather than three
+// positional ones, two of them strings.
+type fieldTag struct {
+	fieldName string
+	value     string
+	present   bool
+}
 
 // Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
@@ -39,7 +50,11 @@ func Set(ptr interface{}) error {
 			continue
 		}
 
-		if err := setField(v.Field(i), defaultVal, ok); err != nil {
+		if err := setField(v.Field(i), fieldTag{
+			fieldName: t.Field(i).Name,
+			value:     defaultVal,
+			present:   ok,
+		}); err != nil {
 			return err
 		}
 	}
@@ -55,12 +70,26 @@ func MustSet(ptr interface{}) {
 	}
 }
 
-func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error {
+func setField(field reflect.Value, tag fieldTag) error {
+	// Kept as a local because the parsing below reads better against a plain name.
+	defaultVal := tag.value
+
+	// parseErr turns a failed parse into the error Set returns, with one exception: an empty tag asks
+	// for this type's zero value rather than for anything to be parsed, so there is nothing to report
+	// and the field keeps the value it already has.
+	parseErr := func(err error) error {
+		if defaultVal == "" {
+			return nil
+		}
+
+		return fmt.Errorf("field %s: invalid default %q: %w", tag.fieldName, defaultVal, err)
+	}
+
 	if !field.CanSet() {
 		return nil
 	}
 
-	if !hasDefaultTag && !shouldInitializeField(field) {
+	if !tag.present && !shouldInitializeField(field) {
 		return nil
 	}
 
@@ -72,25 +101,35 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 
 		switch field.Kind() {
 		case reflect.Bool:
-			if val, err := strconv.ParseBool(defaultVal); err == nil {
-				field.Set(reflect.ValueOf(val).Convert(field.Type()))
+			val, err := strconv.ParseBool(defaultVal)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Int:
-			if val, err := strconv.ParseInt(defaultVal, 0, strconv.IntSize); err == nil {
-				field.Set(reflect.ValueOf(int(val)).Convert(field.Type()))
+			val, err := strconv.ParseInt(defaultVal, 0, strconv.IntSize)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(int(val)).Convert(field.Type()))
 		case reflect.Int8:
-			if val, err := strconv.ParseInt(defaultVal, 0, 8); err == nil {
-				field.Set(reflect.ValueOf(int8(val)).Convert(field.Type()))
+			val, err := strconv.ParseInt(defaultVal, 0, 8)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(int8(val)).Convert(field.Type()))
 		case reflect.Int16:
-			if val, err := strconv.ParseInt(defaultVal, 0, 16); err == nil {
-				field.Set(reflect.ValueOf(int16(val)).Convert(field.Type()))
+			val, err := strconv.ParseInt(defaultVal, 0, 16)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(int16(val)).Convert(field.Type()))
 		case reflect.Int32:
-			if val, err := strconv.ParseInt(defaultVal, 0, 32); err == nil {
-				field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
+			val, err := strconv.ParseInt(defaultVal, 0, 32)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
 		case reflect.Int64:
 			// The duration attempt tolerates surrounding whitespace. Doing it here rather than
 			// against time.Duration's exact type covers named duration types too, and leaves the
@@ -99,39 +138,57 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else if val, err := strconv.ParseInt(defaultVal, 0, 64); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
+			} else {
+				return parseErr(err)
 			}
 		case reflect.Uint:
-			if val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize); err == nil {
-				field.Set(reflect.ValueOf(uint(val)).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(uint(val)).Convert(field.Type()))
 		case reflect.Uint8:
-			if val, err := strconv.ParseUint(defaultVal, 0, 8); err == nil {
-				field.Set(reflect.ValueOf(uint8(val)).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, 8)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(uint8(val)).Convert(field.Type()))
 		case reflect.Uint16:
-			if val, err := strconv.ParseUint(defaultVal, 0, 16); err == nil {
-				field.Set(reflect.ValueOf(uint16(val)).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, 16)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(uint16(val)).Convert(field.Type()))
 		case reflect.Uint32:
-			if val, err := strconv.ParseUint(defaultVal, 0, 32); err == nil {
-				field.Set(reflect.ValueOf(uint32(val)).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, 32)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(uint32(val)).Convert(field.Type()))
 		case reflect.Uint64:
-			if val, err := strconv.ParseUint(defaultVal, 0, 64); err == nil {
-				field.Set(reflect.ValueOf(val).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, 64)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Uintptr:
-			if val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize); err == nil {
-				field.Set(reflect.ValueOf(uintptr(val)).Convert(field.Type()))
+			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(uintptr(val)).Convert(field.Type()))
 		case reflect.Float32:
-			if val, err := strconv.ParseFloat(defaultVal, 32); err == nil {
-				field.Set(reflect.ValueOf(float32(val)).Convert(field.Type()))
+			val, err := strconv.ParseFloat(defaultVal, 32)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(float32(val)).Convert(field.Type()))
 		case reflect.Float64:
-			if val, err := strconv.ParseFloat(defaultVal, 64); err == nil {
-				field.Set(reflect.ValueOf(val).Convert(field.Type()))
+			val, err := strconv.ParseFloat(defaultVal, 64)
+			if err != nil {
+				return parseErr(err)
 			}
+			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.String:
 			field.Set(reflect.ValueOf(defaultVal).Convert(field.Type()))
 
@@ -140,7 +197,7 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
 			if defaultVal != "" && defaultVal != "[]" {
 				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
-					return err
+					return parseErr(err)
 				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
@@ -149,14 +206,14 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 			ref.Elem().Set(reflect.MakeMap(field.Type()))
 			if defaultVal != "" && defaultVal != "{}" {
 				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
-					return err
+					return parseErr(err)
 				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
 			if defaultVal != "" && defaultVal != "{}" {
 				if err := json.Unmarshal([]byte(defaultVal), field.Addr().Interface()); err != nil {
-					return err
+					return parseErr(err)
 				}
 			}
 		case reflect.Pointer:
@@ -167,9 +224,9 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 	switch field.Kind() {
 	case reflect.Pointer:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			// TODO: this drops the error, unlike every other recursion below. Pinned by
-			// TestSet_PointerFieldErrorIsSwallowed; fixing it is a behavior change.
-			setField(field.Elem(), defaultVal, hasDefaultTag) //nolint:errcheck
+			if err := setField(field.Elem(), tag); err != nil {
+				return err
+			}
 			callSetter(field.Interface())
 		}
 	case reflect.Struct:
@@ -178,7 +235,7 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 		}
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			if err := setField(field.Index(j), "", false); err != nil {
+			if err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}); err != nil {
 				return err
 			}
 		}
@@ -204,7 +261,7 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 					v = copyValue.Elem()
 				}
 
-				if err := setField(v, "", false); err != nil {
+				if err := setField(v, fieldTag{fieldName: tag.fieldName}); err != nil {
 					return err
 				}
 
