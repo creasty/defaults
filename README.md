@@ -14,8 +14,6 @@ Initialize structs with default values
   - Scalar types
     - `int/8/16/32/64`, `uint/8/16/32/64`, `float32/64`
     - `uintptr`, `bool`, `string`
-      - A `bool` cannot express "unset": an explicit `false` is identical to the zero value, so
-        `default:"true"` replaces it. Use `*bool` where that distinction matters.
   - Complex types
     - `map`, `slice`, `struct`
   - Nested types
@@ -28,6 +26,12 @@ Initialize structs with default values
 - Recursively initializes fields in a struct
 - Dynamically sets default values by [`defaults.Setter`](./setter.go) interface
 - Preserves non-initial values from being reset with a default value
+  - A field is written only while it still holds its type's zero value. No scalar type can tell an
+    unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool`
+    is `false` — so a zero the caller set on purpose is indistinguishable from one never set, and the
+    default replaces it.
+  - Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to the zero
+    value is preserved: `*bool` is the way to let `false` survive a `default:"true"`.
 
 
 Usage
