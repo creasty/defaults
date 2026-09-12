@@ -6,6 +6,7 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -91,7 +92,10 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 				field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
 			}
 		case reflect.Int64:
-			if val, err := time.ParseDuration(defaultVal); err == nil {
+			// The duration attempt tolerates surrounding whitespace. Doing it here rather than
+			// against time.Duration's exact type covers named duration types too, and leaves the
+			// numeric fallback strict.
+			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else if val, err := strconv.ParseInt(defaultVal, 0, 64); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))

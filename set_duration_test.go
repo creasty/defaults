@@ -65,3 +65,37 @@ func TestSet_DurationDoesNotAffectNarrowerIntegers(t *testing.T) {
 
 	assert.Equal(t, sample{}, got)
 }
+
+// TestSet_DurationTagIsTrimmed covers a duration tag carrying surrounding whitespace, which used to
+// leave the field at zero. The trim happens where ParseDuration is attempted, so it covers every
+// int64-kinded field — including a named duration type, which a check against time.Duration's exact
+// type would miss.
+func TestSet_DurationTagIsTrimmed(t *testing.T) {
+	type myDuration time.Duration
+	type sample struct {
+		Duration time.Duration `default:" 10s "`
+		Named    myDuration    `default:" 10s "`
+		Int64    int64         `default:" 1h "`
+	}
+
+	var got sample
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Equal(t, 10*time.Second, got.Duration)
+	assert.Equal(t, myDuration(10*time.Second), got.Named, "a named duration type is covered too")
+	assert.Equal(t, int64(3600000000000), got.Int64, "an int64 takes a padded duration string, as it already took an unpadded one")
+}
+
+// TestSet_NumberTagIsNotTrimmed pins the boundary: only the duration attempt trims, so a padded
+// number still fails to parse and the field is left alone.
+func TestSet_NumberTagIsNotTrimmed(t *testing.T) {
+	type sample struct {
+		Int   int   `default:" 1 "`
+		Int64 int64 `default:" 64 "`
+	}
+
+	var got sample
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Equal(t, sample{}, got)
+}
