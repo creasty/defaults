@@ -3,10 +3,39 @@ defaults
 
 [![CI](https://img.shields.io/github/actions/workflow/status/creasty/defaults/ci.yml?branch=master&label=CI)](https://github.com/creasty/defaults/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/creasty/defaults/branch/master/graph/badge.svg)](https://codecov.io/gh/creasty/defaults)
+[![Go Reference](https://pkg.go.dev/badge/github.com/creasty/defaults.svg)](https://pkg.go.dev/github.com/creasty/defaults)
 [![GitHub release](https://img.shields.io/github/release/creasty/defaults.svg)](https://github.com/creasty/defaults/releases)
 [![License](https://img.shields.io/github/license/creasty/defaults.svg)](./LICENSE)
 
 Initialize structs with default values
+
+```go
+type Server struct {
+	Host    string            `default:"localhost"`
+	Port    int               `default:"8080"`
+	Timeout time.Duration     `default:"30s"`
+	Tags    []string          `default:"[\"web\"]"`
+	Labels  map[string]string `default:"{\"env\": \"dev\"}"`
+}
+
+var server Server
+if err := defaults.Set(&server); err != nil {
+	panic(err)
+}
+// localhost:8080 30s [web] map[env:dev]
+```
+
+
+Install
+-------
+
+```console
+$ go get github.com/creasty/defaults
+```
+
+
+Features
+--------
 
 - Supports almost all kind of types
   - Scalar types
@@ -15,7 +44,7 @@ Initialize structs with default values
   - Complex types
     - `map`, `slice`, `struct`
   - Nested types
-    - `map[K1]map[K2]Struct`, `[]map[K1]Struct[]`
+    - `map[K1]map[K2]Struct`, `[]map[K1][]Struct`
   - Aliased types
     - `time.Duration`
     - e.g., `type Enum string`
@@ -28,143 +57,58 @@ Initialize structs with default values
     takes precedence over `defaults.Setter` -- the tag is handed to `UnmarshalText` and
     `SetDefaults` is not called
 - Preserves non-initial values from being reset with a default value
-  - A field is written only while it still holds its type's zero value. No scalar type can tell an
-    unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool`
-    is `false` — so a zero the caller set on purpose is indistinguishable from one never set, and the
-    default replaces it.
-  - Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to the zero
-    value is preserved: `*bool` is the way to let `false` survive a `default:"true"`.
+
+The API is three functions: `Set`, `MustSet` (the same, but panicking), and `CanUpdate`. Runnable
+examples for each are on [pkg.go.dev](https://pkg.go.dev/github.com/creasty/defaults#pkg-examples),
+and [`example/main.go`](./example/main.go) walks the composite cases in one program.
 
 
-Usage
------
+Zero values
+-----------
+
+A field is written only while it still holds its type's zero value. No scalar type can tell an
+unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool` is
+`false` — so a zero the caller set on purpose is indistinguishable from one never set, and the
+default replaces it.
+
+Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to the zero
+value is preserved: `*bool` is the way to let `false` survive a `default:"true"`.
 
 ```go
-package main
-
-import (
-	"encoding/json"
-	"fmt"
-	"math/rand"
-
-	"github.com/creasty/defaults"
-)
-
-type Gender string
-
-type Sample struct {
-	Name    string `default:"John Smith"`
-	Age     int    `default:"27"`
-	Gender  Gender `default:"m"`
-	Working bool   `default:"true"`
-
-	SliceInt    []int    `default:"[1, 2, 3]"`
-	SlicePtr    []*int   `default:"[1, 2, 3]"`
-	SliceString []string `default:"[\"a\", \"b\"]"`
-
-	MapNull            map[string]int          `default:"{}"`
-	Map                map[string]int          `default:"{\"key1\": 123}"`
-	MapOfStruct        map[string]OtherStruct  `default:"{\"Key2\": {\"Foo\":123}}"`
-	MapOfPtrStruct     map[string]*OtherStruct `default:"{\"Key3\": {\"Foo\":123}}"`
-	MapOfStructWithTag map[string]OtherStruct  `default:"{\"Key4\": {\"Foo\":123}}"`
-
-	Struct    OtherStruct  `default:"{\"Foo\": 123}"`
-	StructPtr *OtherStruct `default:"{\"Foo\": 123}"`
-
-	NoTag    OtherStruct // Recurses into a nested struct by default
-	NoOption OtherStruct `default:"-"` // no option
-}
-
-type OtherStruct struct {
-	Hello  string `default:"world"` // Tags in a nested struct also work
-	Foo    int    `default:"-"`
-	Random int    `default:"-"`
-}
-
-// SetDefaults implements defaults.Setter interface
-func (s *OtherStruct) SetDefaults() {
-	if defaults.CanUpdate(s.Random) { // Check if it's a zero value (recommended)
-		s.Random = rand.Int() // Set a dynamic value
-	}
-}
-
-func main() {
-	obj := &Sample{}
-	if err := defaults.Set(obj); err != nil {
-		panic(err)
-	}
-
-	out, err := json.MarshalIndent(obj, "", "	")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(out))
-
-	// Output:
-	// {
-	// 	"Name": "John Smith",
-	// 	"Age": 27,
-	// 	"Gender": "m",
-	// 	"Working": true,
-	// 	"SliceInt": [
-	// 		1,
-	// 		2,
-	// 		3
-	// 	],
-	// 	"SlicePtr": [
-	// 		1,
-	// 		2,
-	// 		3
-	// 	],
-	// 	"SliceString": [
-	// 		"a",
-	// 		"b"
-	// 	],
-	// 	"MapNull": {},
-	// 	"Map": {
-	// 		"key1": 123
-	// 	},
-	// 	"MapOfStruct": {
-	// 		"Key2": {
-	// 			"Hello": "world",
-	// 			"Foo": 123,
-	// 			"Random": 5577006791947779410
-	// 		}
-	// 	},
-	// 	"MapOfPtrStruct": {
-	// 		"Key3": {
-	// 			"Hello": "world",
-	// 			"Foo": 123,
-	// 			"Random": 8674665223082153551
-	// 		}
-	// 	},
-	// 	"MapOfStructWithTag": {
-	// 		"Key4": {
-	// 			"Hello": "world",
-	// 			"Foo": 123,
-	// 			"Random": 6129484611666145821
-	// 		}
-	// 	},
-	// 	"Struct": {
-	// 		"Hello": "world",
-	// 		"Foo": 123,
-	// 		"Random": 4037200794235010051
-	// 	},
-	// 	"StructPtr": {
-	// 		"Hello": "world",
-	// 		"Foo": 123,
-	// 		"Random": 3916589616287113937
-	// 	},
-	// 	"NoTag": {
-	// 		"Hello": "world",
-	// 		"Foo": 0,
-	// 		"Random": 6334824724549167320
-	// 	},
-	// 	"NoOption": {
-	// 		"Hello": "",
-	// 		"Foo": 0,
-	// 		"Random": 0
-	// 	}
-	// }
+type Feature struct {
+	Enabled bool  `default:"true"` // a caller's false is replaced
+	Verbose *bool `default:"true"` // a caller's &false survives
 }
 ```
+
+`default:"-"` opts a field out entirely: it is neither parsed nor recursed into. That is how a field
+gets its value from a `SetDefaults` method instead of a tag.
+
+
+Design principles
+-----------------
+
+These are the terms the library has been maintained on; see
+[#61](https://github.com/creasty/defaults/issues/61) for the full note.
+
+**Keep it simple.** The scope is narrow by design — read a tag, fill a field — and it is meant to
+stay that way. Two things that come up and are deliberately not here:
+
+- *Validation* ([#36](https://github.com/creasty/defaults/issues/36)) is a separate concern and
+  belongs in a validation library.
+- *`Unset`* ([#42](https://github.com/creasty/defaults/issues/42),
+  [#44](https://github.com/creasty/defaults/pull/44)) is an interesting idea, but the added
+  complexity has not been shown to pay for itself. If it is ever pursued, it should share the
+  traversal and parsing with `Set` behind an internal operation mode rather than duplicate them, so
+  that the two are guaranteed to work as a proper pair.
+
+**Stay comprehensive.** Broad type support and high test coverage are what make the library
+trustworthy. Statement coverage is 100% and CI enforces it, and every supported type has a test
+pinning its behavior — including the behavior that looks wrong, which is pinned with a comment
+saying so rather than left to be rediscovered.
+
+
+License
+-------
+
+[MIT](./LICENSE)

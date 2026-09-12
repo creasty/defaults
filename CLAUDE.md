@@ -15,7 +15,9 @@ currently supported one. Keep the two in step.
 
 ## Tests
 
-`package defaults_test` — black box, public API only, one file per behavior under test.
+`package defaults_test` — black box, public API only, one file per behavior under test. The files
+stay beside the source, not in a subdirectory: coverage of `.` and the `Example*` functions
+pkg.go.dev renders both depend on the tests living in the package's own directory.
 
 - Declare each test's struct inside the test function. Package-level types only where a method is
   required (`SetDefaults`, `UnmarshalText`, `UnmarshalJSON`), named with a file-unique prefix.
