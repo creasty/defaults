@@ -59,7 +59,7 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 		return nil
 	}
 
-	if !shouldInitializeField(field, defaultVal, hasDefaultTag) {
+	if !hasDefaultTag && !shouldInitializeField(field) {
 		return nil
 	}
 
@@ -226,21 +226,21 @@ func isInitialValue(field reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
 }
 
-func shouldInitializeField(field reflect.Value, tag string, hasDefaultTag bool) bool {
+// shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
+// any tag: a struct is always descended into, as is a pointer the caller already allocated, and a
+// container the caller already filled has elements to recurse into. Whether a tag is present is the
+// caller's business.
+func shouldInitializeField(field reflect.Value) bool {
 	switch field.Kind() {
 	case reflect.Struct:
 		return true
 	case reflect.Pointer:
-		if !field.IsNil() && field.Elem().Kind() == reflect.Struct {
-			return true
-		}
-	case reflect.Slice:
-		return field.Len() > 0 || tag != ""
-	case reflect.Map:
-		return field.Len() > 0 || tag != ""
+		return !field.IsNil() && field.Elem().Kind() == reflect.Struct
+	case reflect.Slice, reflect.Map:
+		return field.Len() > 0
 	}
 
-	return hasDefaultTag
+	return false
 }
 
 // CanUpdate returns true when the given value is an initial value of its type

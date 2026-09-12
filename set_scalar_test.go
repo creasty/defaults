@@ -343,12 +343,10 @@ func TestSet_UnparsableValuesAreIgnored(t *testing.T) {
 // TestSet_EmptyTag covers `default:""`, which is a request for the zero value rather than an
 // absence: Set reads the tag with Tag.Lookup, so an empty tag differs from no tag at all.
 //
-// A scalar is set to its zero value, which is indistinguishable from doing nothing, and a pointer is
-// allocated. A slice and a map are still left nil, because their branch of shouldInitializeField
-// tests what the tag contains rather than whether it is there.
-//
-// QUIRK: that asymmetry arrived with https://github.com/creasty/defaults/pull/63 and arguably wants
-// settling one way or the other.
+// Every kind treats it the same way — a scalar is set to its zero value, which is
+// indistinguishable from doing nothing, and a pointer, slice and map are each allocated empty.
+// TestSet_UntaggedPointerStaysNil, TestSet_UntaggedSliceStaysNil and TestSet_UntaggedMapStaysNil
+// cover the other side, where no tag means no allocation.
 func TestSet_EmptyTag(t *testing.T) {
 	type sample struct {
 		String string         `default:""`
@@ -363,9 +361,12 @@ func TestSet_EmptyTag(t *testing.T) {
 
 	assert.Empty(t, got.String)
 	assert.Zero(t, got.Int)
-	assert.Nil(t, got.Slice, "a container tests the tag's content, so an empty tag does nothing")
-	assert.Nil(t, got.Map)
-	require.NotNil(t, got.Ptr, "a pointer is allocated, because the tag is present")
+
+	require.NotNil(t, got.Slice)
+	assert.Empty(t, got.Slice)
+	require.NotNil(t, got.Map)
+	assert.Empty(t, got.Map)
+	require.NotNil(t, got.Ptr)
 	assert.Zero(t, *got.Ptr)
 }
 
