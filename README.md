@@ -83,9 +83,6 @@ gets its value from a `SetDefaults` method instead of a tag.
 
 ## Design principles
 
-The terms the library is maintained on; see
-[#61](https://github.com/creasty/defaults/issues/61) for the full note.
-
 **Keep it simple.** The scope is narrow by design — read a tag, fill a field — and is meant to stay
 that way. Adjacent concerns belong in adjacent libraries.
 
