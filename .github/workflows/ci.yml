@@ -1,0 +1,59 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest version go.mod supports, plus every currently supported release.
+        go:
+          - '1.21'
+          - '1.26'
+          - '1.27'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - run: make cover
+      - name: Report coverage
+        run: |
+          {
+            printf '### Coverage (Go %s)\n\n```\n' '${{ matrix.go }}'
+            go tool cover -func=coverage.out
+            printf '```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: codecov/codecov-action@v7
+        if: matrix.go == '1.27'
+        with:
+          files: ./coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache-dependency-path: go.sum
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13

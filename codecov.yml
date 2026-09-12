@@ -1,0 +1,14 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# Neither is part of the library: example/ is a runnable demo, internal/fixture only exists to be
+# read from tests in another package.
+ignore:
+  - example/**
+  - internal/fixture/**

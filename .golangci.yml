@@ -1,0 +1,19 @@
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  exclusions:
+    rules:
+      # Naming the embedded struct is the point of the assertion in those tests.
+      - path: _test\.go
+        linters:
+          - staticcheck
+        text: QF1008
+
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gofmt:
+      simplify: true
