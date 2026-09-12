@@ -340,9 +340,14 @@ func TestSet_UnparsableValuesAreIgnored(t *testing.T) {
 	})
 }
 
-// TestSet_EmptyTagIsNoOp pins that `default:""` is indistinguishable from carrying no tag at all:
-// containers and pointers stay nil rather than being allocated empty.
-func TestSet_EmptyTagIsNoOp(t *testing.T) {
+// TestSet_EmptyTag covers `default:""`, which is a request for the zero value rather than an
+// absence: Set reads the tag with Tag.Lookup, so an empty tag differs from no tag at all.
+//
+// Every kind treats it the same way — a scalar is set to its zero value, which is
+// indistinguishable from doing nothing, and a pointer, slice and map are each allocated empty.
+// TestSet_UntaggedPointerStaysNil, TestSet_UntaggedSliceStaysNil and TestSet_UntaggedMapStaysNil
+// cover the other side, where no tag means no allocation.
+func TestSet_EmptyTag(t *testing.T) {
 	type sample struct {
 		String string         `default:""`
 		Int    int            `default:""`
@@ -354,10 +359,15 @@ func TestSet_EmptyTagIsNoOp(t *testing.T) {
 	var got sample
 	require.NoError(t, defaults.Set(&got))
 
-	assert.Equal(t, sample{}, got)
-	assert.Nil(t, got.Slice)
-	assert.Nil(t, got.Map)
-	assert.Nil(t, got.Ptr)
+	assert.Empty(t, got.String)
+	assert.Zero(t, got.Int)
+
+	require.NotNil(t, got.Slice)
+	assert.Empty(t, got.Slice)
+	require.NotNil(t, got.Map)
+	assert.Empty(t, got.Map)
+	require.NotNil(t, got.Ptr)
+	assert.Zero(t, *got.Ptr)
 }
 
 // TestSet_UnsupportedKindsAreIgnored pins that kinds setField has no case for are left alone, tag
