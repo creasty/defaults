@@ -184,23 +184,33 @@ func setField(field reflect.Value, defaultVal string, hasDefaultTag bool) error 
 		}
 	case reflect.Map:
 		for _, e := range field.MapKeys() {
-			var v = field.MapIndex(e)
+			v := field.MapIndex(e)
+
+			// A pointer value is written through, so it needs no copy and no write-back. Everything
+			// else does: a map value is not addressable, so it is worked on as a copy and put back.
+			originalIsPtr := v.Kind() == reflect.Pointer
+			if originalIsPtr {
+				if v.IsNil() {
+					continue
+				}
+				v = v.Elem()
+			}
 
 			switch v.Kind() {
-			case reflect.Pointer:
-				switch v.Elem().Kind() {
-				case reflect.Struct, reflect.Slice, reflect.Map:
-					if err := setField(v.Elem(), "", false); err != nil {
-						return err
-					}
-				}
 			case reflect.Struct, reflect.Slice, reflect.Map:
-				ref := reflect.New(v.Type())
-				ref.Elem().Set(v)
-				if err := setField(ref.Elem(), "", false); err != nil {
+				if !v.CanAddr() {
+					copyValue := reflect.New(v.Type())
+					copyValue.Elem().Set(v)
+					v = copyValue.Elem()
+				}
+
+				if err := setField(v, "", false); err != nil {
 					return err
 				}
-				field.SetMapIndex(e, ref.Elem().Convert(v.Type()))
+
+				if !originalIsPtr {
+					field.SetMapIndex(e, v)
+				}
 			}
 		}
 	}
