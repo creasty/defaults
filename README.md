@@ -26,6 +26,12 @@ Initialize structs with default values
 - Recursively initializes fields in a struct
 - Dynamically sets default values by [`defaults.Setter`](./setter.go) interface
 - Preserves non-initial values from being reset with a default value
+  - A field is written only while it still holds its type's zero value. No scalar type can tell an
+    unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool`
+    is `false` — so a zero the caller set on purpose is indistinguishable from one never set, and the
+    default replaces it.
+  - Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to the zero
+    value is preserved: `*bool` is the way to let `false` survive a `default:"true"`.
 
 
 Usage
