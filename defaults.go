@@ -66,9 +66,6 @@ func setField(field reflect.Value, defaultVal string) error {
 		if unmarshalByInterface(field, defaultVal) {
 			return nil
 		}
-		if parseByMethod(field, defaultVal) {
-			return nil
-		}
 
 		switch field.Kind() {
 		case reflect.Bool:
@@ -92,7 +89,10 @@ func setField(field reflect.Value, defaultVal string) error {
 				field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
 			}
 		case reflect.Int64:
-			if val, err := time.ParseDuration(defaultVal); err == nil {
+			// The duration attempt tolerates surrounding whitespace. Doing it here rather than
+			// against time.Duration's exact type covers named duration types too, and leaves the
+			// numeric fallback strict.
+			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else if val, err := strconv.ParseInt(defaultVal, 0, 64); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
@@ -218,20 +218,6 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) bool {
 		// if field implements json.Unmarshaler, try to use it before decode by kind
 		if err := asJSON.UnmarshalJSON([]byte(defaultVal)); err == nil {
 			return true
-		}
-	}
-	return false
-}
-
-func parseByMethod(field reflect.Value, defaultVal string) bool {
-	if field.Type() == reflect.TypeOf(time.Duration(0)) {
-		if defaultVal != "" {
-			defaultVal = strings.TrimSpace(defaultVal)
-			duration, err := time.ParseDuration(defaultVal)
-			if err == nil {
-				field.Set(reflect.ValueOf(duration))
-				return true
-			}
 		}
 	}
 	return false
