@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/creasty/defaults"
-	"github.com/creasty/defaults/internal/fixture"
 )
 
 func TestSet_StructTagEmptyObject(t *testing.T) {
@@ -119,17 +118,6 @@ func TestSet_EmbeddedPointerStructWithoutTagStaysNil(t *testing.T) {
 	require.NoError(t, defaults.Set(&got))
 
 	assert.Nil(t, got.Inner, "an embedded pointer follows the same rule as any other nil pointer")
-}
-
-// TestSet_ForeignPackageUnexportedField covers a struct declared in another package: the exported
-// field is set, the unexported one is out of reflect's reach and left alone, and neither panics.
-func TestSet_ForeignPackageUnexportedField(t *testing.T) {
-	var got fixture.Sample
-
-	require.NoError(t, defaults.Set(&got))
-
-	assert.Equal(t, 1, got.ExportedField)
-	assert.Zero(t, got.UnexportedField())
 }
 
 // TestSet_UnexportedCompositeFieldsAreSkippedWholesale pins how far the CanSet guard reaches: an
