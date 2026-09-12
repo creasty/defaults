@@ -138,12 +138,13 @@ func TestSet_UntaggedPointerStructRecurses(t *testing.T) {
 	assert.Equal(t, child{Name: "Jim", Age: 20}, *got.Child, "the caller's name survives, the missing age is filled")
 }
 
-// TestSet_PointerWithEmptyTagStaysNil pins that `default:""` on a pointer allocates nothing, so
-// there is no way to ask for a pointer to the zero value.
+// TestSet_PointerWithEmptyTag covers `default:""` on a pointer. The tag is present, so the pointer
+// is allocated and points at the zero value — it used to stay nil, which left no way to ask for a
+// pointer to an empty string. See https://github.com/creasty/defaults/issues/52.
 //
-// QUIRK: see https://github.com/creasty/defaults/issues/52 and
-// https://github.com/creasty/defaults/pull/63.
-func TestSet_PointerWithEmptyTagStaysNil(t *testing.T) {
+// What makes this expressible is Set reading the tag with Tag.Lookup rather than Tag.Get, so an
+// empty tag differs from no tag; TestSet_UntaggedPointerStaysNil covers the other side.
+func TestSet_PointerWithEmptyTag(t *testing.T) {
 	type sample struct {
 		String *string `default:""`
 		Int    *int    `default:""`
@@ -152,8 +153,10 @@ func TestSet_PointerWithEmptyTagStaysNil(t *testing.T) {
 	var got sample
 	require.NoError(t, defaults.Set(&got))
 
-	assert.Nil(t, got.String)
-	assert.Nil(t, got.Int)
+	require.NotNil(t, got.String)
+	require.NotNil(t, got.Int)
+	assert.Empty(t, *got.String)
+	assert.Zero(t, *got.Int)
 }
 
 // TestSet_NestedPointersAreAllocated covers arbitrary pointer depth: every level is allocated and

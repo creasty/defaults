@@ -217,8 +217,11 @@ func TestSet_TimeTime(t *testing.T) {
 	})
 }
 
-// TestSet_UnmarshalerNeedsANonEmptyTag pins that neither interface is consulted for an empty tag,
-// so a type that could unmarshal anything still gets nothing.
+// TestSet_UnmarshalerNeedsANonEmptyTag pins that neither interface is consulted for an empty tag, so
+// a type that could unmarshal anything gets nothing from one.
+//
+// The field is still touched, though: net.IP is slice-kinded, so the kind path allocates it empty
+// like any other container carrying `default:""`.
 func TestSet_UnmarshalerNeedsANonEmptyTag(t *testing.T) {
 	type sample struct {
 		Both umBoth `default:""`
@@ -228,6 +231,7 @@ func TestSet_UnmarshalerNeedsANonEmptyTag(t *testing.T) {
 	var got sample
 	require.NoError(t, defaults.Set(&got))
 
-	assert.Empty(t, got.Both.Via)
-	assert.Nil(t, got.IP)
+	assert.Empty(t, got.Both.Via, "no unmarshaler ran")
+	require.NotNil(t, got.IP, "but the container is allocated")
+	assert.Empty(t, got.IP)
 }
