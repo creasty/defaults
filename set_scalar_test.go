@@ -152,10 +152,8 @@ func TestSet_IntegerLiteralBases(t *testing.T) {
 // that width to strconv as a literal, and a wrong one is invisible except at the boundary: the
 // largest value that must parse, and a value past it that must not.
 //
-// The out-of-range values are chosen to truncate to something non-zero, which is what makes the
-// second subtest able to fail at all. A power of two truncates to zero, so `uint8 default:"256"`
-// asserting the zero value would still pass if the width were widened to 16; 257 truncates to 1 and
-// would not.
+// Values past the boundary are covered by TestSet_UnparsableValuesAreRejected, which asserts the
+// error they now produce; a wider parse would succeed there and report no error.
 func TestSet_NumericWidthBoundaries(t *testing.T) {
 	t.Run("largest value parses", func(t *testing.T) {
 		type sample struct {
@@ -205,25 +203,6 @@ func TestSet_NumericWidthBoundaries(t *testing.T) {
 			Int32: math.MinInt32,
 			Int64: math.MinInt64,
 		}, got)
-	})
-
-	t.Run("past the boundary the field is left alone", func(t *testing.T) {
-		type sample struct {
-			Int8    int8    `default:"128"`        // -128 if parsed any wider
-			Int8Min int8    `default:"-129"`       // 127 if parsed any wider
-			Int16   int16   `default:"32768"`      // -32768
-			Int32   int32   `default:"2147483648"` // -2147483648
-			Uint8   uint8   `default:"257"`        // 1
-			Uint16  uint16  `default:"65537"`      // 1
-			Uint32  uint32  `default:"4294967297"` // 1
-			Float32 float32 `default:"1e39"`       // +Inf
-			Float64 float64 `default:"1e309"`      // +Inf
-		}
-
-		var got sample
-		require.NoError(t, defaults.Set(&got))
-
-		assert.Equal(t, sample{}, got)
 	})
 
 	// The widths of int, uint and uintptr come from strconv.IntSize, so their boundary literals are
@@ -296,48 +275,87 @@ func TestSet_NamedScalarTypes(t *testing.T) {
 	}, got)
 }
 
-// TestSet_UnparsableValuesAreIgnored pins that a value the field's kind cannot parse is dropped
-// without a word: the field keeps its zero value and Set reports success.
+// TestSet_UnparsableValuesAreRejected covers a value the field's kind cannot parse: Set now returns
+// an error naming the field, where it used to leave the field at zero and report success. See
+// https://github.com/creasty/defaults/issues/54.
 //
-// QUIRK: arguably a malformed tag deserves an error. See
-// https://github.com/creasty/defaults/pull/59.
-func TestSet_UnparsableValuesAreIgnored(t *testing.T) {
-	t.Run("out of range", func(t *testing.T) {
-		type sample struct {
-			Int8  int8  `default:"999"`
-			Uint8 uint8 `default:"256"`
-			Uint  uint  `default:"-1"`
-		}
+// Every kind is listed because each has its own strconv call and its own error branch. The integer
+// values are one past the width's boundary, so this doubles as the check that each width parses at
+// the size it claims: a wider parse would succeed and no error would come back.
+func TestSet_UnparsableValuesAreRejected(t *testing.T) {
+	tests := []struct {
+		name string
+		ptr  interface{}
+	}{
+		{"bool", &struct {
+			V bool `default:"notabool"`
+		}{}},
+		{"int", &struct {
+			V int `default:"abc"`
+		}{}},
+		{"int8", &struct {
+			V int8 `default:"128"`
+		}{}},
+		{"int16", &struct {
+			V int16 `default:"32768"`
+		}{}},
+		{"int32", &struct {
+			V int32 `default:"2147483648"`
+		}{}},
+		{"int64", &struct {
+			V int64 `default:"9223372036854775808"`
+		}{}},
+		{"uint", &struct {
+			V uint `default:"-1"`
+		}{}},
+		{"uint8", &struct {
+			V uint8 `default:"257"`
+		}{}},
+		{"uint16", &struct {
+			V uint16 `default:"65537"`
+		}{}},
+		{"uint32", &struct {
+			V uint32 `default:"4294967297"`
+		}{}},
+		{"uint64", &struct {
+			V uint64 `default:"18446744073709551616"`
+		}{}},
+		{"uintptr", &struct {
+			V uintptr `default:"-1"`
+		}{}},
+		{"float32", &struct {
+			V float32 `default:"1e39"`
+		}{}},
+		{"float64", &struct {
+			V float64 `default:"abc"`
+		}{}},
+	}
 
-		var got sample
-		require.NoError(t, defaults.Set(&got))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Error(t, defaults.Set(tt.ptr))
+		})
+	}
+}
 
-		assert.Equal(t, sample{}, got)
-	})
+// TestSet_InvalidDefaultErrorShape pins what the error carries: the field it came from, the tag that
+// failed, and the underlying cause still reachable — the last of which is why the cause is wrapped
+// with %w rather than formatted with %v.
+func TestSet_InvalidDefaultErrorShape(t *testing.T) {
+	got := struct {
+		Retries int8 `default:"999"`
+	}{}
 
-	t.Run("not a number", func(t *testing.T) {
-		type sample struct {
-			Int     int     `default:"3.5"`
-			Float64 float64 `default:"abc"`
-			Uint    uint    `default:"0x"`
-		}
+	err := defaults.Set(&got)
 
-		var got sample
-		require.NoError(t, defaults.Set(&got))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "field Retries")
+	assert.ErrorContains(t, err, `invalid default "999"`)
 
-		assert.Equal(t, sample{}, got)
-	})
+	var numErr *strconv.NumError
+	assert.ErrorAs(t, err, &numErr, "the cause stays reachable through the wrapping")
 
-	t.Run("not a bool", func(t *testing.T) {
-		type sample struct {
-			Bool bool `default:"notabool"`
-		}
-
-		var got sample
-		require.NoError(t, defaults.Set(&got))
-
-		assert.False(t, got.Bool)
-	})
+	assert.Zero(t, got.Retries, "and the field is left alone")
 }
 
 // TestSet_EmptyTagIsNoOp pins that `default:""` is indistinguishable from carrying no tag at all:

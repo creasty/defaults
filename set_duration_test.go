@@ -52,16 +52,23 @@ func TestSet_DurationAndIntegerShareOneParser(t *testing.T) {
 	assert.Equal(t, int64(64), got.NumberOnInt64, "and a plain number still works")
 }
 
-// TestSet_DurationDoesNotAffectNarrowerIntegers pins that the duration fallback is int64-only:
-// narrower widths reject a duration string and keep their zero value.
-func TestSet_DurationDoesNotAffectNarrowerIntegers(t *testing.T) {
-	type sample struct {
-		Int   int   `default:"1h"`
-		Int32 int32 `default:"1h"`
-	}
+// TestSet_DurationStringOnANarrowerIntegerIsRejected pins that the duration fallback is int64-only.
+// A narrower width rejects a duration string outright, where it used to keep its zero value and
+// report success.
+func TestSet_DurationStringOnANarrowerIntegerIsRejected(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		got := struct {
+			V int `default:"1h"`
+		}{}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		require.Error(t, defaults.Set(&got), "only int64 gets the duration fallback")
+	})
 
-	assert.Equal(t, sample{}, got)
+	t.Run("int32", func(t *testing.T) {
+		got := struct {
+			V int32 `default:"1h"`
+		}{}
+
+		require.Error(t, defaults.Set(&got))
+	})
 }
