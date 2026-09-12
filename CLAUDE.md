@@ -8,6 +8,7 @@ design — read the design principles in
 
 - `make test` — `go test -race -shuffle=on ./...`
 - `make cover` — the same, plus a coverage profile and the per-function table
+- `make bench` — the benchmarks, without `-race` or `-shuffle=on`: both distort the numbers
 - `make lint` / `make fmt` — golangci-lint v2, configured in `.golangci.yml`
 
 `go.mod` declares the oldest supported Go release and the CI matrix tests that version plus every
