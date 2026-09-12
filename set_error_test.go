@@ -126,12 +126,10 @@ func TestSet_InvalidJSONInTag(t *testing.T) {
 	}
 }
 
-// TestSet_PointerFieldErrorIsSwallowed pins today's behavior for a *struct field whose nested tag is
-// invalid: nothing is reported, and the nested field is silently left unset.
-//
-// BUG(defaults.go:163): setField's error is discarded there, unlike every other recursion. When that
-// is fixed, these become require.Error and this test's name should change with it.
-func TestSet_PointerFieldErrorIsSwallowed(t *testing.T) {
+// TestSet_PointerFieldErrorIsReported covers a *struct field whose nested tag is invalid. That error
+// used to be discarded, alone among the recursions, so a malformed tag went unreported depending on
+// whether the field it sat behind was a pointer. See https://github.com/creasty/defaults/issues/68.
+func TestSet_PointerFieldErrorIsReported(t *testing.T) {
 	type badSlice struct {
 		Ints []int `default:"[!]"`
 	}
@@ -141,10 +139,7 @@ func TestSet_PointerFieldErrorIsSwallowed(t *testing.T) {
 			Ptr *badSlice `default:"{}"`
 		}{}
 
-		require.NoError(t, defaults.Set(&got), "the JSON error is dropped")
-
-		require.NotNil(t, got.Ptr)
-		assert.Nil(t, got.Ptr.Ints)
+		require.Error(t, defaults.Set(&got))
 	})
 
 	t.Run("pointer provided by the caller", func(t *testing.T) {
@@ -152,10 +147,7 @@ func TestSet_PointerFieldErrorIsSwallowed(t *testing.T) {
 			Ptr *badSlice
 		}{Ptr: &badSlice{}}
 
-		require.NoError(t, defaults.Set(&got), "the JSON error is dropped")
-
-		require.NotNil(t, got.Ptr)
-		assert.Nil(t, got.Ptr.Ints)
+		require.Error(t, defaults.Set(&got))
 	})
 }
 

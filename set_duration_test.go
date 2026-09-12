@@ -52,18 +52,25 @@ func TestSet_DurationAndIntegerShareOneParser(t *testing.T) {
 	assert.Equal(t, int64(64), got.NumberOnInt64, "and a plain number still works")
 }
 
-// TestSet_DurationDoesNotAffectNarrowerIntegers pins that the duration fallback is int64-only:
-// narrower widths reject a duration string and keep their zero value.
-func TestSet_DurationDoesNotAffectNarrowerIntegers(t *testing.T) {
-	type sample struct {
-		Int   int   `default:"1h"`
-		Int32 int32 `default:"1h"`
-	}
+// TestSet_DurationStringOnANarrowerIntegerIsRejected pins that the duration fallback is int64-only.
+// A narrower width rejects a duration string outright, where it used to keep its zero value and
+// report success.
+func TestSet_DurationStringOnANarrowerIntegerIsRejected(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		got := struct {
+			V int `default:"1h"`
+		}{}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		require.Error(t, defaults.Set(&got), "only int64 gets the duration fallback")
+	})
 
-	assert.Equal(t, sample{}, got)
+	t.Run("int32", func(t *testing.T) {
+		got := struct {
+			V int32 `default:"1h"`
+		}{}
+
+		require.Error(t, defaults.Set(&got))
+	})
 }
 
 // TestSet_DurationTagIsTrimmed covers a duration tag carrying surrounding whitespace, which used to
@@ -86,16 +93,29 @@ func TestSet_DurationTagIsTrimmed(t *testing.T) {
 	assert.Equal(t, int64(3600000000000), got.Int64, "an int64 takes a padded duration string, as it already took an unpadded one")
 }
 
-// TestSet_NumberTagIsNotTrimmed pins the boundary: only the duration attempt trims, so a padded
-// number still fails to parse and the field is left alone.
+// TestSet_NumberTagIsNotTrimmed pins the other side of that trim: it belongs to the duration
+// attempt alone, so a padded number reaches the numeric parser exactly as written and is rejected.
+// It used to be ignored silently, leaving the field at zero.
+//
+// One field per subtest, because Set returns on the first error: a shared struct would leave the
+// second field unexercised.
 func TestSet_NumberTagIsNotTrimmed(t *testing.T) {
-	type sample struct {
-		Int   int   `default:" 1 "`
-		Int64 int64 `default:" 64 "`
-	}
+	t.Run("int", func(t *testing.T) {
+		got := struct {
+			V int `default:" 1 "`
+		}{}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		require.ErrorContains(t, defaults.Set(&got), `field V: invalid default " 1 "`)
+		assert.Zero(t, got.V)
+	})
 
-	assert.Equal(t, sample{}, got)
+	t.Run("int64", func(t *testing.T) {
+		got := struct {
+			V int64 `default:" 64 "`
+		}{}
+
+		require.ErrorContains(t, defaults.Set(&got), `field V: invalid default " 64 "`,
+			"the duration attempt trims, its numeric fallback does not")
+		assert.Zero(t, got.V)
+	})
 }

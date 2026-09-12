@@ -185,7 +185,9 @@ func TestSetter_EmbeddedPointerStruct(t *testing.T) {
 // is why a SetDefaults implementation has to be idempotent, and why the README recommends guarding
 // it with CanUpdate.
 //
-// QUIRK(defaults.go:164): the double call is not by design, just how the recursion falls out.
+// QUIRK: the double call is not by design, just how the recursion falls out — the pointer branch of
+// setField calls the setter after the recursion that already called it. See
+// https://github.com/creasty/defaults/issues/67.
 func TestSetter_InvocationCount(t *testing.T) {
 	t.Run("root", func(t *testing.T) {
 		var got setterCounter
