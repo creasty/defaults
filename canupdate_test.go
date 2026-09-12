@@ -1,6 +1,7 @@
 package defaults_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -9,8 +10,8 @@ import (
 	"github.com/creasty/defaults"
 )
 
-// TestCanUpdate covers what "can update" means: deep-equal to the zero value of its own type. Note
-// that an allocated-but-empty slice or map is therefore already non-initial.
+// TestCanUpdate covers what "can update" means: the value still holds the zero value of its own
+// type. Note that an allocated-but-empty slice or map is therefore already non-initial.
 func TestCanUpdate(t *testing.T) {
 	type st struct {
 		Int int
@@ -52,6 +53,24 @@ func TestCanUpdate(t *testing.T) {
 			assert.Equal(t, tt.want, defaults.CanUpdate(tt.value))
 		})
 	}
+}
+
+// TestCanUpdate_FloatEdges pins the two floats where a per-kind zero check and a comparison against
+// the zero value could plausibly disagree: a negative zero counts as zero, a NaN does not. Both hold
+// inside a struct too, which is where reflect has historically drawn the line differently
+// (https://github.com/golang/go/issues/61827).
+func TestCanUpdate_FloatEdges(t *testing.T) {
+	type st struct {
+		Float float64
+	}
+
+	negZero := math.Copysign(0, -1)
+	nan := math.NaN()
+
+	assert.True(t, defaults.CanUpdate(negZero), "a negative zero is a zero")
+	assert.True(t, defaults.CanUpdate(st{Float: negZero}), "and so is a struct holding one")
+	assert.False(t, defaults.CanUpdate(nan), "a NaN is not equal to zero")
+	assert.False(t, defaults.CanUpdate(st{Float: nan}), "nor is a struct holding one")
 }
 
 // TestCanUpdate_Nil covers a nil, which carries no type to compare against: there is nothing there to

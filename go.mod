@@ -1,6 +1,6 @@
 module github.com/creasty/defaults
 
-go 1.21
+go 1.22
 
 require github.com/stretchr/testify v1.12.1
 

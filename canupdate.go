@@ -3,10 +3,12 @@ package defaults
 import "reflect"
 
 func isInitialValue(field reflect.Value) bool {
+	// An invalid Value carries no type, so IsZero would panic on it. There is nothing there to
+	// preserve either: see https://github.com/creasty/defaults/issues/47.
 	if !field.IsValid() {
 		return true
 	}
-	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
+	return field.IsZero()
 }
 
 // CanUpdate returns true when the given value is an initial value of its type

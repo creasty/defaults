@@ -18,6 +18,10 @@ fmt:
 test:
 	@go test $(GO_TEST_FLAGS) ./...
 
+.PHONY: bench
+bench:
+	@go test -run '^$$' -bench . -benchmem .
+
 .PHONY: cover
 cover:
 	@go test $(GO_TEST_FLAGS) -covermode=atomic -coverprofile=coverage.out .
