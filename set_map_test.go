@@ -103,6 +103,38 @@ func TestSet_MapOfPointerStructsGetsDefaults(t *testing.T) {
 	assert.Equal(t, inner{Name: "inner"}, *got.Map["b"])
 }
 
+// TestSet_MapOfNilPointersIsLeftAlone covers a nil pointer as a map value: there is nothing behind
+// it to recurse into. A pointer map value is written through rather than copied back, so allocating
+// one here would have to be a deliberate choice, and it is not made -- unlike a nil pointer *field*,
+// which a tag does allocate.
+func TestSet_MapOfNilPointersIsLeftAlone(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	t.Run("from the caller", func(t *testing.T) {
+		got := struct {
+			Map map[string]*inner
+		}{Map: map[string]*inner{"a": nil}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.Contains(t, got.Map, "a", "the key stays")
+		assert.Nil(t, got.Map["a"], "with no struct behind it")
+	})
+
+	t.Run("from the tag", func(t *testing.T) {
+		got := struct {
+			Map map[string]*inner `default:"{\"a\": null}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.Contains(t, got.Map, "a")
+		assert.Nil(t, got.Map["a"])
+	})
+}
+
 // TestSet_MapTagCreatesStructElements covers elements the tag itself creates: they are defaulted
 // like any other element, and no other key appears.
 func TestSet_MapTagCreatesStructElements(t *testing.T) {
