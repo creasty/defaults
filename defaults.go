@@ -160,7 +160,9 @@ func setField(field reflect.Value, defaultVal string) error {
 	switch field.Kind() {
 	case reflect.Ptr:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			setField(field.Elem(), defaultVal)
+			// TODO: this drops the error, unlike every other recursion below. Pinned by
+			// TestSet_PointerFieldErrorIsSwallowed; fixing it is a behavior change.
+			setField(field.Elem(), defaultVal) //nolint:errcheck
 			callSetter(field.Interface())
 		}
 	case reflect.Struct:
