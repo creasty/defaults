@@ -54,13 +54,15 @@ func TestCanUpdate(t *testing.T) {
 	}
 }
 
-// TestCanUpdate_PanicsOnUntypedNil pins that an untyped nil has no type to compare against, so the
-// reflect call behind CanUpdate fails.
+// TestCanUpdate_Nil covers a nil, which carries no type to compare against: there is nothing there to
+// preserve, so it is updatable. It used to panic inside reflect instead.
 //
-// QUIRK: a nil could reasonably be reported as updatable. See
-// https://github.com/creasty/defaults/pull/64.
-func TestCanUpdate_PanicsOnUntypedNil(t *testing.T) {
-	assert.Panics(t, func() {
-		defaults.CanUpdate(nil)
-	})
+// A nil value of an interface type collapses to the same invalid reflect.Value as an untyped nil, and
+// that is how this was reached in practice — a nil interface field read by a SetDefaults
+// implementation. See https://github.com/creasty/defaults/issues/47.
+func TestCanUpdate_Nil(t *testing.T) {
+	var nilError error
+
+	assert.True(t, defaults.CanUpdate(nil), "an untyped nil")
+	assert.True(t, defaults.CanUpdate(nilError), "a nil value of an interface type")
 }

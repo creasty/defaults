@@ -45,8 +45,9 @@ func TestSet_RejectsNonStructPointer(t *testing.T) {
 // TestSet_PanicsOnNil pins that a nil argument is not rejected but fatal: the type switch happens
 // before any validation.
 //
-// QUIRK: arguably these should return the same error as any other non-struct-pointer. See
-// https://github.com/creasty/defaults/pull/64.
+// QUIRK: arguably these should return the same error as any other non-struct-pointer. CanUpdate's
+// half of this was fixed in #64; Set's own guard was not. See
+// https://github.com/creasty/defaults/issues/69.
 func TestSet_PanicsOnNil(t *testing.T) {
 	type sample struct {
 		Int int `default:"1"`
