@@ -62,14 +62,6 @@ func Set(ptr interface{}) error {
 	return nil
 }
 
-// MustSet function is a wrapper of Set function
-// It will call Set and panic if err not equals nil.
-func MustSet(ptr interface{}) {
-	if err := Set(ptr); err != nil {
-		panic(err)
-	}
-}
-
 func setField(field reflect.Value, tag fieldTag) error {
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
@@ -293,13 +285,6 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) bool {
 	return false
 }
 
-func isInitialValue(field reflect.Value) bool {
-	if !field.IsValid() {
-		return true
-	}
-	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
-}
-
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
 // any tag: a struct is always descended into, as is a pointer the caller already allocated, and a
 // container the caller already filled has elements to recurse into. Whether a tag is present is the
@@ -315,9 +300,4 @@ func shouldInitializeField(field reflect.Value) bool {
 	}
 
 	return false
-}
-
-// CanUpdate returns true when the given value is an initial value of its type
-func CanUpdate(v interface{}) bool {
-	return isInitialValue(reflect.ValueOf(v))
 }

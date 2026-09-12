@@ -7,8 +7,6 @@ coverage:
       default:
         informational: true
 
-# Neither is part of the library: example/ is a runnable demo, internal/fixture only exists to be
-# read from tests in another package.
+# Not part of the library: example/ is a runnable demo.
 ignore:
   - example/**
-  - internal/fixture/**
