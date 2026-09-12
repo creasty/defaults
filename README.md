@@ -24,7 +24,11 @@ Initialize structs with default values
   - Pointer types
     - e.g., `*SampleStruct`, `*int`
 - Recursively initializes fields in a struct
-- Dynamically sets default values by [`defaults.Setter`](./setter.go) interface
+- Dynamically sets default values by:
+  - Implementing the [`defaults.Setter`](./setter.go) interface, or
+  - Implementing [`encoding.TextUnmarshaler`](https://pkg.go.dev/encoding#TextUnmarshaler), which
+    takes precedence over `defaults.Setter` -- the tag is handed to `UnmarshalText` and
+    `SetDefaults` is not called
 - Preserves non-initial values from being reset with a default value
   - A field is written only while it still holds its type's zero value. No scalar type can tell an
     unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool`
