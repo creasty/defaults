@@ -10,8 +10,8 @@ import (
 	"github.com/creasty/defaults"
 )
 
-// TestCanUpdate covers what "can update" means: deep-equal to the zero value of its own type. Note
-// that an allocated-but-empty slice or map is therefore already non-initial.
+// TestCanUpdate covers what "can update" means: the value still holds the zero value of its own
+// type. Note that an allocated-but-empty slice or map is therefore already non-initial.
 func TestCanUpdate(t *testing.T) {
 	type st struct {
 		Int int
