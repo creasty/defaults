@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,17 @@ func (e *umJSONEnum) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	return errors.New("unknown enum")
+}
+
+// umJSONRecorder implements only json.Unmarshaler, and records the raw bytes it was handed so a
+// test can tell whether it was called at all.
+type umJSONRecorder struct {
+	Raw string
+}
+
+func (u *umJSONRecorder) UnmarshalJSON(b []byte) error {
+	u.Raw = string(b)
+	return nil
 }
 
 // umBoth implements both interfaces and records which one was used.
@@ -125,17 +137,84 @@ func TestSet_FailingUnmarshalerFallsBackToKind(t *testing.T) {
 	assert.Equal(t, umFailingJSON(5), got.JSON, "parsed as an int after UnmarshalJSON failed")
 }
 
-// TestSet_JSONUnmarshalerSkipsEmptyContainers pins that `{}` and `[]` never reach a custom
-// UnmarshalJSON: they mean "allocate an empty one", so the unmarshaler would have nothing to add.
-func TestSet_JSONUnmarshalerSkipsEmptyContainers(t *testing.T) {
-	type sample struct {
-		Object umBoth `default:"{}"`
-	}
+// TestSet_EmptyContainerTagsAndJSONUnmarshaler pins which empty-container tags reach a custom
+// UnmarshalJSON. The interface path withholds both `{}` and `[]`, on the grounds that they mean
+// "allocate an empty one" — but for a struct-kinded type the kind-based path then hands `[]` to
+// encoding/json anyway, which calls the very same method. So the two are not symmetric.
+//
+// This needs a type that implements *only* json.Unmarshaler. With one that also implements
+// UnmarshalText, text wins first and the JSON guard is never evaluated, which makes the test unable
+// to fail.
+func TestSet_EmptyContainerTagsAndJSONUnmarshaler(t *testing.T) {
+	t.Run("an object tag is withheld", func(t *testing.T) {
+		type sample struct {
+			Value umJSONRecorder `default:"{}"`
+		}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		var got sample
+		require.NoError(t, defaults.Set(&got))
 
-	assert.Equal(t, "text", got.Object.Via, "UnmarshalText is still tried; only the JSON branch skips {}")
+		assert.Empty(t, got.Value.Raw, "UnmarshalJSON is not called for {}")
+	})
+
+	t.Run("an array tag arrives through encoding/json", func(t *testing.T) {
+		type sample struct {
+			Value umJSONRecorder `default:"[]"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "[]", got.Value.Raw,
+			"QUIRK: the interface path withholds [] but the struct path passes it to encoding/json, which calls UnmarshalJSON")
+	})
+
+	t.Run("any other value arrives directly", func(t *testing.T) {
+		type sample struct {
+			Value umJSONRecorder `default:"{\"a\": 1}"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, `{"a": 1}`, got.Value.Raw)
+	})
+
+	t.Run("the text unmarshaler is still tried for an object tag", func(t *testing.T) {
+		type sample struct {
+			Value umBoth `default:"{}"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "text", got.Value.Via, "only the JSON branch withholds {}")
+	})
+}
+
+// TestSet_TimeTime covers the stdlib struct most likely to carry a default tag. It reaches
+// time.Time's UnmarshalText, and a value that does not parse is a hard error rather than a silent
+// skip — the one common way a caller meets that path.
+func TestSet_TimeTime(t *testing.T) {
+	t.Run("RFC 3339", func(t *testing.T) {
+		type sample struct {
+			At time.Time `default:"2020-01-02T03:04:05Z"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "2020-01-02T03:04:05Z", got.At.Format(time.RFC3339))
+	})
+
+	t.Run("unparsable", func(t *testing.T) {
+		got := struct {
+			At time.Time `default:"nonsense"`
+		}{}
+
+		require.Error(t, defaults.Set(&got))
+		assert.True(t, got.At.IsZero())
+	})
 }
 
 // TestSet_UnmarshalerNeedsANonEmptyTag pins that neither interface is consulted for an empty tag,

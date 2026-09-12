@@ -28,13 +28,16 @@ func TestSet_Duration(t *testing.T) {
 	}, got)
 }
 
-// TestSet_DurationIsTriedBeforeInteger pins that every int64-kinded field goes through
-// time.ParseDuration first and strconv.ParseInt only as a fallback. So a bare number on a Duration
-// is nanoseconds, and a duration string on a plain int64 is its nanosecond count.
+// TestSet_DurationAndIntegerShareOneParser pins the outcomes of int64-kinded fields being handed to
+// both time.ParseDuration and strconv.ParseInt: a bare number on a Duration is nanoseconds, and a
+// duration string on a plain int64 is its nanosecond count.
 //
-// QUIRK: the parsers are picked by kind, not by type, so int64 and time.Duration are
-// indistinguishable here. See https://github.com/creasty/defaults/pull/55.
-func TestSet_DurationIsTriedBeforeInteger(t *testing.T) {
+// Which parser is tried first is deliberately not asserted, because it is not observable: the two
+// accept disjoint inputs, so swapping them changes nothing.
+//
+// QUIRK: the parsers are picked by kind, not by type, so int64 and time.Duration cannot be told
+// apart. See https://github.com/creasty/defaults/issues/66.
+func TestSet_DurationAndIntegerShareOneParser(t *testing.T) {
 	type sample struct {
 		BareNumberOnDuration time.Duration `default:"1"`
 		DurationOnInt64      int64         `default:"1h"`
@@ -44,9 +47,9 @@ func TestSet_DurationIsTriedBeforeInteger(t *testing.T) {
 	var got sample
 	require.NoError(t, defaults.Set(&got))
 
-	assert.Equal(t, time.Nanosecond, got.BareNumberOnDuration, "a bare number is parsed as nanoseconds")
+	assert.Equal(t, time.Nanosecond, got.BareNumberOnDuration, "a bare number is nanoseconds")
 	assert.Equal(t, int64(3600000000000), got.DurationOnInt64, "a duration string lands on a plain int64")
-	assert.Equal(t, int64(64), got.NumberOnInt64, "ParseInt still handles what ParseDuration rejects")
+	assert.Equal(t, int64(64), got.NumberOnInt64, "and a plain number still works")
 }
 
 // TestSet_DurationDoesNotAffectNarrowerIntegers pins that the duration fallback is int64-only:

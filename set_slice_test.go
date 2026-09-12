@@ -140,3 +140,55 @@ func TestSet_SliceOfScalarsIsLeftAlone(t *testing.T) {
 
 	assert.Equal(t, []int{0, 2}, got.Ints)
 }
+
+// TestSet_ArraysAreLeftAlone pins that reflect.Array has no case in setField, which makes an array
+// behave unlike the slice of the same element type: its tag is dropped without an error, and its
+// elements are not descended into.
+func TestSet_ArraysAreLeftAlone(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+	type sample struct {
+		Ints     [2]int   `default:"[1, 2]"`
+		Structs  [1]inner `default:"[{}]"`
+		Provided [1]inner
+	}
+
+	got := sample{Provided: [1]inner{{}}}
+	require.NoError(t, defaults.Set(&got), "an array tag is ignored rather than rejected")
+
+	assert.Equal(t, [2]int{}, got.Ints, "the tag is dropped, where a []int would have been filled")
+	assert.Equal(t, [1]inner{}, got.Structs)
+	assert.Equal(t, [1]inner{}, got.Provided, "array elements are not descended into, where slice elements are")
+}
+
+// TestSet_ByteSlice covers []byte, where encoding/json accepts two spellings and rejects bare text.
+func TestSet_ByteSlice(t *testing.T) {
+	t.Run("json array", func(t *testing.T) {
+		got := struct {
+			B []byte `default:"[104, 105]"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, []byte("hi"), got.B)
+	})
+
+	t.Run("base64 string", func(t *testing.T) {
+		got := struct {
+			B []byte `default:"\"aGk=\""`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, []byte("hi"), got.B)
+	})
+
+	t.Run("bare text is an error", func(t *testing.T) {
+		got := struct {
+			B []byte `default:"hi"`
+		}{}
+
+		require.Error(t, defaults.Set(&got), "a []byte tag goes through encoding/json, so it is not a plain string")
+	})
+}

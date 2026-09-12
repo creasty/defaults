@@ -66,6 +66,16 @@ func (s *setterOuter) SetDefaults() {
 	}
 }
 
+// setterLevel is a non-struct type with a setter. It is the one shape whose setter is invoked only
+// by the pointer branch of setField, because the struct recursion never sees it — so a change there
+// that looks redundant would silently stop calling it. See
+// https://github.com/creasty/defaults/issues/67.
+type setterLevel int
+
+func (l *setterLevel) SetDefaults() {
+	*l += 100
+}
+
 func TestSetter_CalledOnRoot(t *testing.T) {
 	var got setterBar
 
@@ -237,4 +247,43 @@ func TestSetter_InvocationCount(t *testing.T) {
 		require.NotNil(t, got.Map["a"])
 		assert.Equal(t, 1, got.Map["a"].Calls)
 	})
+}
+
+func TestSetter_CalledOnPointerToNonStruct(t *testing.T) {
+	t.Run("behind a pointer", func(t *testing.T) {
+		got := struct {
+			Level *setterLevel `default:"3"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Level)
+		assert.Equal(t, setterLevel(103), *got.Level, "the tag sets 3, then the setter adds 100")
+	})
+
+	t.Run("not behind a pointer", func(t *testing.T) {
+		got := struct {
+			Level setterLevel `default:"3"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, setterLevel(3), got.Level, "a non-struct value field never reaches a setter")
+	})
+}
+
+// TestSetter_RunsAgainOnASecondSet pins that Set is not idempotent as far as setters go: calling it
+// twice calls them twice over, which is the other half of why a setter has to be idempotent itself.
+func TestSetter_RunsAgainOnASecondSet(t *testing.T) {
+	var got struct {
+		Value setterCounter
+		Ptr   *setterCounter `default:"{}"`
+	}
+
+	require.NoError(t, defaults.Set(&got))
+	require.NoError(t, defaults.Set(&got))
+
+	require.NotNil(t, got.Ptr)
+	assert.Equal(t, 2, got.Value.Calls)
+	assert.Equal(t, 4, got.Ptr.Calls)
 }

@@ -169,3 +169,52 @@ func TestSet_ErrorStopsAtTheFirstField(t *testing.T) {
 	require.Error(t, defaults.Set(&got))
 	assert.Empty(t, got.After)
 }
+
+// TestSet_WellFormedJSONOfTheWrongShape covers the other way decoding fails: valid JSON that cannot
+// land in the field's type. It surfaces as *json.UnmarshalTypeError, not a syntax error.
+func TestSet_WellFormedJSONOfTheWrongShape(t *testing.T) {
+	got := struct {
+		Ints []int `default:"{}"`
+	}{}
+
+	err := defaults.Set(&got)
+
+	require.Error(t, err)
+	var typeErr *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &typeErr)
+}
+
+// TestSet_WhitespaceTagIsNotEmpty pins that a stray space is a value rather than an absence: a
+// string takes it verbatim, and every container tries to decode it as JSON and fails.
+func TestSet_WhitespaceTagIsNotEmpty(t *testing.T) {
+	t.Run("a string takes it", func(t *testing.T) {
+		got := struct {
+			S string `default:" "`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, " ", got.S)
+	})
+
+	tests := []struct {
+		name string
+		ptr  interface{}
+	}{
+		{"slice", &struct {
+			V []int `default:" "`
+		}{}},
+		{"map", &struct {
+			V map[string]int `default:" "`
+		}{}},
+		{"struct", &struct {
+			V struct{ I int } `default:" "`
+		}{}},
+	}
+
+	for _, tt := range tests {
+		t.Run("a "+tt.name+" fails to decode it", func(t *testing.T) {
+			assert.Error(t, defaults.Set(tt.ptr))
+		})
+	}
+}

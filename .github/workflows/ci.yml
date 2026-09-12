@@ -40,7 +40,6 @@ jobs:
             printf '```\n'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: codecov/codecov-action@v7
-        if: matrix.go == '1.27'
         with:
           files: ./coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
