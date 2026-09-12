@@ -45,6 +45,21 @@ func (u *umJSONRecorder) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// umTextAndSetter implements encoding.TextUnmarshaler and defaults.Setter, and appends to Via as
+// each one runs, so a test can tell "only text ran" from "both ran" whichever order they take.
+type umTextAndSetter struct {
+	Via string
+}
+
+func (u *umTextAndSetter) UnmarshalText(text []byte) error {
+	u.Via += "text:" + string(text)
+	return nil
+}
+
+func (u *umTextAndSetter) SetDefaults() {
+	u.Via += "+setter"
+}
+
 // umBoth implements both interfaces and records which one was used.
 type umBoth struct {
 	Via string
@@ -120,6 +135,33 @@ func TestSet_TextUnmarshalerWinsOverJSON(t *testing.T) {
 	require.NoError(t, defaults.Set(&got))
 
 	assert.Equal(t, "text", got.Both.Via)
+}
+
+// TestSet_TextUnmarshalerWinsOverSetter pins the precedence the README claims. A successful
+// UnmarshalText returns out of setField ahead of the recursion that descends into the struct, and
+// SetDefaults is reached only through that recursion -- so the setter never runs for this field.
+// The root's own SetDefaults is unaffected, because Set calls it directly; that is
+// TestSetter_CalledOnRoot.
+func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
+	t.Run("with a value to unmarshal", func(t *testing.T) {
+		got := struct {
+			Value umTextAndSetter `default:"x"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "text:x", got.Value.Via, "UnmarshalText ran and SetDefaults did not")
+	})
+
+	t.Run("with an empty tag", func(t *testing.T) {
+		got := struct {
+			Value umTextAndSetter `default:""`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "+setter", got.Value.Via, "nothing to unmarshal, so the setter is reached")
+	})
 }
 
 // TestSet_FailingUnmarshalerFallsBackToKind covers what happens when the type's own unmarshaler
