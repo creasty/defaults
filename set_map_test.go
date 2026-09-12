@@ -151,3 +151,58 @@ func TestSet_MapOfScalarsIsLeftAlone(t *testing.T) {
 
 	assert.Equal(t, map[string]int{"zero": 0, "one": 1}, got.Map)
 }
+
+// TestSet_MapOfPointerContainers covers map values that point at a container rather than a struct.
+// The element loop handles all three of struct, slice and map behind a pointer.
+func TestSet_MapOfPointerContainers(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+	type sample struct {
+		Slices map[string]*[]inner
+		Maps   map[string]*map[string]inner
+	}
+
+	slice := []inner{{}}
+	nested := map[string]inner{"x": {}}
+	got := sample{
+		Slices: map[string]*[]inner{"a": &slice},
+		Maps:   map[string]*map[string]inner{"a": &nested},
+	}
+	require.NoError(t, defaults.Set(&got))
+
+	require.NotNil(t, got.Slices["a"])
+	require.Len(t, *got.Slices["a"], 1)
+	assert.Equal(t, "inner", (*got.Slices["a"])[0].Name)
+
+	require.NotNil(t, got.Maps["a"])
+	assert.Equal(t, "inner", (*got.Maps["a"])["x"].Name)
+}
+
+// TestSet_MapTagIsNotReappliedToElements pins that the element recursion is handed an empty tag: the
+// parent's JSON builds the map once and is not decoded again into each element. The values here are
+// chosen so that re-applying it would be an error rather than a no-op.
+func TestSet_MapTagIsNotReappliedToElements(t *testing.T) {
+	t.Run("element is a container", func(t *testing.T) {
+		got := struct {
+			Map map[string][]int `default:"{\"a\": null}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, map[string][]int{"a": nil}, got.Map)
+	})
+
+	t.Run("element is a pointer to a container", func(t *testing.T) {
+		var empty []int
+		got := struct {
+			Map map[string]*[]int `default:"{\"x\": [9]}"`
+		}{Map: map[string]*[]int{"a": &empty}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Map["a"])
+		assert.Nil(t, *got.Map["a"], "the caller's map is kept, and its element is left alone")
+		assert.NotContains(t, got.Map, "x", "the tag is not applied to a map the caller provided")
+	})
+}

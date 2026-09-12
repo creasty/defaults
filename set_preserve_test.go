@@ -122,6 +122,8 @@ func TestSet_PreservesNonInitialZeroLengthContainers(t *testing.T) {
 	got := sample{Slice: []int{}, Map: map[string]int{}}
 	require.NoError(t, defaults.Set(&got))
 
+	assert.NotNil(t, got.Slice, "the caller's allocation is kept rather than replaced by the tag's")
 	assert.Empty(t, got.Slice)
+	assert.NotNil(t, got.Map)
 	assert.Empty(t, got.Map)
 }

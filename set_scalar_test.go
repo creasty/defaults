@@ -1,6 +1,8 @@
 package defaults_test
 
 import (
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,82 +86,166 @@ func TestSet_String(t *testing.T) {
 func TestSet_IntegerLiteralBases(t *testing.T) {
 	t.Run("octal", func(t *testing.T) {
 		type sample struct {
-			Int    int    `default:"0o14"`
-			Int8   int8   `default:"0o14"`
-			Int16  int16  `default:"0o14"`
-			Int32  int32  `default:"0o14"`
-			Int64  int64  `default:"0o14"`
-			Uint   uint   `default:"0o14"`
-			Uint8  uint8  `default:"0o14"`
-			Uint16 uint16 `default:"0o14"`
-			Uint32 uint32 `default:"0o14"`
-			Uint64 uint64 `default:"0o14"`
+			Int     int     `default:"0o14"`
+			Int8    int8    `default:"0o14"`
+			Int16   int16   `default:"0o14"`
+			Int32   int32   `default:"0o14"`
+			Int64   int64   `default:"0o14"`
+			Uint    uint    `default:"0o14"`
+			Uint8   uint8   `default:"0o14"`
+			Uint16  uint16  `default:"0o14"`
+			Uint32  uint32  `default:"0o14"`
+			Uint64  uint64  `default:"0o14"`
+			Uintptr uintptr `default:"0o14"`
 		}
 
 		var got sample
 		require.NoError(t, defaults.Set(&got))
 
-		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
+		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
 	})
 
 	t.Run("hexadecimal", func(t *testing.T) {
 		type sample struct {
-			Int    int    `default:"0xc"`
-			Int8   int8   `default:"0xc"`
-			Int16  int16  `default:"0xc"`
-			Int32  int32  `default:"0xc"`
-			Int64  int64  `default:"0xc"`
-			Uint   uint   `default:"0xc"`
-			Uint8  uint8  `default:"0xc"`
-			Uint16 uint16 `default:"0xc"`
-			Uint32 uint32 `default:"0xc"`
-			Uint64 uint64 `default:"0xc"`
+			Int     int     `default:"0xc"`
+			Int8    int8    `default:"0xc"`
+			Int16   int16   `default:"0xc"`
+			Int32   int32   `default:"0xc"`
+			Int64   int64   `default:"0xc"`
+			Uint    uint    `default:"0xc"`
+			Uint8   uint8   `default:"0xc"`
+			Uint16  uint16  `default:"0xc"`
+			Uint32  uint32  `default:"0xc"`
+			Uint64  uint64  `default:"0xc"`
+			Uintptr uintptr `default:"0xc"`
 		}
 
 		var got sample
 		require.NoError(t, defaults.Set(&got))
 
-		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
+		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
 	})
 
 	t.Run("binary", func(t *testing.T) {
 		type sample struct {
-			Int    int    `default:"0b1100"`
-			Int8   int8   `default:"0b1100"`
-			Int16  int16  `default:"0b1100"`
-			Int32  int32  `default:"0b1100"`
-			Int64  int64  `default:"0b1100"`
-			Uint   uint   `default:"0b1100"`
-			Uint8  uint8  `default:"0b1100"`
-			Uint16 uint16 `default:"0b1100"`
-			Uint32 uint32 `default:"0b1100"`
-			Uint64 uint64 `default:"0b1100"`
+			Int     int     `default:"0b1100"`
+			Int8    int8    `default:"0b1100"`
+			Int16   int16   `default:"0b1100"`
+			Int32   int32   `default:"0b1100"`
+			Int64   int64   `default:"0b1100"`
+			Uint    uint    `default:"0b1100"`
+			Uint8   uint8   `default:"0b1100"`
+			Uint16  uint16  `default:"0b1100"`
+			Uint32  uint32  `default:"0b1100"`
+			Uint64  uint64  `default:"0b1100"`
+			Uintptr uintptr `default:"0b1100"`
 		}
 
 		var got sample
 		require.NoError(t, defaults.Set(&got))
 
-		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
+		assert.Equal(t, sample{12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12}, got)
 	})
+}
 
-	t.Run("width boundaries", func(t *testing.T) {
+// TestSet_NumericWidthBoundaries pins the bit size each numeric case parses with. Every case passes
+// that width to strconv as a literal, and a wrong one is invisible except at the boundary: the
+// largest value that must parse, and a value past it that must not.
+//
+// The out-of-range values are chosen to truncate to something non-zero, which is what makes the
+// second subtest able to fail at all. A power of two truncates to zero, so `uint8 default:"256"`
+// asserting the zero value would still pass if the width were widened to 16; 257 truncates to 1 and
+// would not.
+func TestSet_NumericWidthBoundaries(t *testing.T) {
+	t.Run("largest value parses", func(t *testing.T) {
 		type sample struct {
-			Int8Max  int8   `default:"0x7f"`
-			Int8Min  int8   `default:"-0x80"`
-			Uint8Max uint8  `default:"0o377"`
-			Int16Max int16  `default:"0b111111111111111"`
-			Uint64   uint64 `default:"0xffffffffffffffff"`
+			Int8    int8    `default:"127"`
+			Int16   int16   `default:"32767"`
+			Int32   int32   `default:"2147483647"`
+			Int64   int64   `default:"9223372036854775807"`
+			Uint8   uint8   `default:"255"`
+			Uint16  uint16  `default:"65535"`
+			Uint32  uint32  `default:"4294967295"`
+			Uint64  uint64  `default:"18446744073709551615"`
+			Float32 float32 `default:"3.4028234e38"`
+			Float64 float64 `default:"1.7976931348623157e308"`
 		}
 
 		var got sample
 		require.NoError(t, defaults.Set(&got))
 
 		assert.Equal(t, sample{
-			Int8Max:  127,
-			Int8Min:  -128,
-			Uint8Max: 255,
-			Int16Max: 32767,
-			Uint64:   18446744073709551615,
+			Int8:    math.MaxInt8,
+			Int16:   math.MaxInt16,
+			Int32:   math.MaxInt32,
+			Int64:   math.MaxInt64,
+			Uint8:   math.MaxUint8,
+			Uint16:  math.MaxUint16,
+			Uint32:  math.MaxUint32,
+			Uint64:  math.MaxUint64,
+			Float32: math.MaxFloat32,
+			Float64: math.MaxFloat64,
+		}, got)
+	})
+
+	t.Run("smallest value parses", func(t *testing.T) {
+		type sample struct {
+			Int8  int8  `default:"-128"`
+			Int16 int16 `default:"-32768"`
+			Int32 int32 `default:"-2147483648"`
+			Int64 int64 `default:"-9223372036854775808"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, sample{
+			Int8:  math.MinInt8,
+			Int16: math.MinInt16,
+			Int32: math.MinInt32,
+			Int64: math.MinInt64,
+		}, got)
+	})
+
+	t.Run("past the boundary the field is left alone", func(t *testing.T) {
+		type sample struct {
+			Int8    int8    `default:"128"`        // -128 if parsed any wider
+			Int8Min int8    `default:"-129"`       // 127 if parsed any wider
+			Int16   int16   `default:"32768"`      // -32768
+			Int32   int32   `default:"2147483648"` // -2147483648
+			Uint8   uint8   `default:"257"`        // 1
+			Uint16  uint16  `default:"65537"`      // 1
+			Uint32  uint32  `default:"4294967297"` // 1
+			Float32 float32 `default:"1e39"`       // +Inf
+			Float64 float64 `default:"1e309"`      // +Inf
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, sample{}, got)
+	})
+
+	// The widths of int, uint and uintptr come from strconv.IntSize, so their boundary literals are
+	// only meaningful where that is 64.
+	t.Run("platform-width integers", func(t *testing.T) {
+		if strconv.IntSize != 64 {
+			t.Skipf("strconv.IntSize is %d; the literals below are 64-bit", strconv.IntSize)
+		}
+
+		type sample struct {
+			Int     int     `default:"9223372036854775807"`
+			Uint    uint    `default:"18446744073709551615"`
+			Uintptr uintptr `default:"18446744073709551615"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, sample{
+			Int:     math.MaxInt,
+			Uint:    math.MaxUint,
+			Uintptr: math.MaxUint,
 		}, got)
 	})
 }
@@ -306,4 +392,23 @@ func TestSet_UnexportedFieldsAreSkipped(t *testing.T) {
 
 	assert.Equal(t, "set", got.Exported)
 	assert.Empty(t, got.unexported, "reflect cannot set it, so the tag is inert")
+}
+
+// TestSet_InterfaceFieldsAreNotFollowed pins that a non-nil interface is not descended into, even
+// when it holds a pointer to a struct carrying tags. The same value in a typed field would be filled
+// in, so what a field can receive depends on how it is declared.
+func TestSet_InterfaceFieldsAreNotFollowed(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+	type sample struct {
+		Iface interface{}
+	}
+
+	got := sample{Iface: &inner{}}
+	require.NoError(t, defaults.Set(&got))
+
+	held, ok := got.Iface.(*inner)
+	require.True(t, ok)
+	assert.Empty(t, held.Name, "the tag inside the held value never applies")
 }
