@@ -54,7 +54,7 @@ func MustSet(ptr interface{}) {
 
 func setField(field reflect.Value, currFieldName, defaultVal string) error {
 	wrapErr := func(err error) error {
-		return fmt.Errorf("error on set Field:[%s], DefaultValue:[%s] Error:[%v]", currFieldName, defaultVal, err)
+		return fmt.Errorf("field %s: invalid default %q: %w", currFieldName, defaultVal, err)
 	}
 
 	if !field.CanSet() {
