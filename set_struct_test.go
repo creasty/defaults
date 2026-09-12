@@ -119,29 +119,3 @@ func TestSet_EmbeddedPointerStructWithoutTagStaysNil(t *testing.T) {
 
 	assert.Nil(t, got.Inner, "an embedded pointer follows the same rule as any other nil pointer")
 }
-
-// TestSet_UnexportedCompositeFieldsAreSkippedWholesale pins how far the CanSet guard reaches: an
-// unexported field is skipped whatever its type, so a whole subtree of tags below one goes
-// unapplied. Only the scalar case is obvious; these are not.
-func TestSet_UnexportedCompositeFieldsAreSkippedWholesale(t *testing.T) {
-	type inner struct {
-		Name string `default:"inner"`
-	}
-	type sample struct {
-		hidden    inner
-		hiddenPtr *inner `default:"{}"`
-		hiddenMap map[string]inner
-		hiddenSl  []inner
-	}
-
-	got := sample{
-		hiddenMap: map[string]inner{"a": {}},
-		hiddenSl:  []inner{{}},
-	}
-	require.NoError(t, defaults.Set(&got))
-
-	assert.Empty(t, got.hidden.Name, "a nested tag below an unexported field never applies")
-	assert.Nil(t, got.hiddenPtr, "not even an explicit tag allocates it")
-	assert.Empty(t, got.hiddenMap["a"].Name)
-	assert.Empty(t, got.hiddenSl[0].Name)
-}

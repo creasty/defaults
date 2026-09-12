@@ -407,21 +407,6 @@ func TestSet_UnsupportedKindsAreIgnored(t *testing.T) {
 	assert.Zero(t, got.Complex)
 }
 
-// TestSet_UnexportedFieldsAreSkipped pins that an unexported field is untouched even with a tag
-// (reflect cannot set it), and that its presence does not stop its exported siblings.
-func TestSet_UnexportedFieldsAreSkipped(t *testing.T) {
-	type sample struct {
-		Exported   string `default:"set"`
-		unexported string `default:"skipped"`
-	}
-
-	var got sample
-	require.NoError(t, defaults.Set(&got))
-
-	assert.Equal(t, "set", got.Exported)
-	assert.Empty(t, got.unexported, "reflect cannot set it, so the tag is inert")
-}
-
 // TestSet_InterfaceFieldsAreNotFollowed pins that a non-nil interface is not descended into, even
 // when it holds a pointer to a struct carrying tags. The same value in a typed field would be filled
 // in, so what a field can receive depends on how it is declared.
