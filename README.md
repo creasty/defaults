@@ -1,5 +1,4 @@
-defaults
-========
+# defaults
 
 [![CI](https://img.shields.io/github/actions/workflow/status/creasty/defaults/ci.yml?branch=master&label=CI)](https://github.com/creasty/defaults/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/creasty/defaults/branch/master/graph/badge.svg)](https://codecov.io/gh/creasty/defaults)
@@ -26,16 +25,14 @@ if err := defaults.Set(&server); err != nil {
 ```
 
 
-Install
--------
+## Install
 
 ```console
 $ go get github.com/creasty/defaults
 ```
 
 
-Features
---------
+## Features
 
 - Supports almost all kind of types
   - Scalar types
@@ -63,8 +60,7 @@ examples for each are on [pkg.go.dev](https://pkg.go.dev/github.com/creasty/defa
 and [`example/main.go`](./example/main.go) walks the composite cases in one program.
 
 
-Zero values
------------
+## Zero values
 
 A field is written only while it still holds its type's zero value. No scalar type can tell an
 unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool` is
@@ -85,22 +81,13 @@ type Feature struct {
 gets its value from a `SetDefaults` method instead of a tag.
 
 
-Design principles
------------------
+## Design principles
 
-These are the terms the library has been maintained on; see
+The terms the library is maintained on; see
 [#61](https://github.com/creasty/defaults/issues/61) for the full note.
 
-**Keep it simple.** The scope is narrow by design — read a tag, fill a field — and it is meant to
-stay that way. Two things that come up and are deliberately not here:
-
-- *Validation* ([#36](https://github.com/creasty/defaults/issues/36)) is a separate concern and
-  belongs in a validation library.
-- *`Unset`* ([#42](https://github.com/creasty/defaults/issues/42),
-  [#44](https://github.com/creasty/defaults/pull/44)) is an interesting idea, but the added
-  complexity has not been shown to pay for itself. If it is ever pursued, it should share the
-  traversal and parsing with `Set` behind an internal operation mode rather than duplicate them, so
-  that the two are guaranteed to work as a proper pair.
+**Keep it simple.** The scope is narrow by design — read a tag, fill a field — and is meant to stay
+that way. Adjacent concerns belong in adjacent libraries.
 
 **Stay comprehensive.** Broad type support and high test coverage are what make the library
 trustworthy. Statement coverage is 100% and CI enforces it, and every supported type has a test
@@ -108,7 +95,6 @@ pinning its behavior — including the behavior that looks wrong, which is pinne
 saying so rather than left to be rediscovered.
 
 
-License
--------
+## License
 
 [MIT](./LICENSE)
