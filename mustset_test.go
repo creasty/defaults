@@ -40,6 +40,27 @@ func TestMustSet_PanicsForPointerToNonStruct(t *testing.T) {
 	})
 }
 
+// TestMustSet_PanicsForNil pins that a nil panics with Set's error. It used to panic too, but
+// from inside Set, before there was an error to panic with. See
+// https://github.com/creasty/defaults/issues/69.
+func TestMustSet_PanicsForNil(t *testing.T) {
+	type sample struct {
+		String string `default:"hello"`
+	}
+
+	t.Run("untyped nil", func(t *testing.T) {
+		assert.PanicsWithError(t, "not a struct pointer", func() {
+			defaults.MustSet(nil)
+		})
+	})
+
+	t.Run("typed nil pointer", func(t *testing.T) {
+		assert.PanicsWithError(t, "not a struct pointer", func() {
+			defaults.MustSet((*sample)(nil))
+		})
+	})
+}
+
 func TestMustSet_PanicsForInvalidTag(t *testing.T) {
 	got := struct {
 		Ints []int `default:"[!]"`
