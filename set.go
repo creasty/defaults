@@ -33,11 +33,15 @@ type fieldTag struct {
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
 func Set(ptr interface{}) error {
-	if reflect.TypeOf(ptr).Kind() != reflect.Pointer {
+	// The kind is read off the Value because reflect.TypeOf(nil) is itself nil, and a nil pointer
+	// has no struct behind it to fill: its Elem is an invalid Value, which has no Type. See
+	// https://github.com/creasty/defaults/issues/69.
+	v := reflect.ValueOf(ptr)
+	if v.Kind() != reflect.Pointer || v.IsNil() {
 		return errInvalidType
 	}
 
-	v := reflect.ValueOf(ptr).Elem()
+	v = v.Elem()
 	t := v.Type()
 
 	if t.Kind() != reflect.Struct {

@@ -42,27 +42,22 @@ func TestSet_RejectsNonStructPointer(t *testing.T) {
 	}
 }
 
-// TestSet_PanicsOnNil pins that a nil argument is not rejected but fatal: the type switch happens
-// before any validation.
+// TestSet_RejectsNil covers a nil, typed or not, which has no struct behind it to fill: it is
+// rejected with the same error as any other non-struct-pointer. It used to panic instead.
 //
-// QUIRK: arguably these should return the same error as any other non-struct-pointer. CanUpdate's
-// half of this was fixed in #64; Set's own guard was not. See
-// https://github.com/creasty/defaults/issues/69.
-func TestSet_PanicsOnNil(t *testing.T) {
+// The typed nil is the case real code is likely to hit — a config pointer that was never
+// allocated. See https://github.com/creasty/defaults/issues/69.
+func TestSet_RejectsNil(t *testing.T) {
 	type sample struct {
 		Int int `default:"1"`
 	}
 
 	t.Run("untyped nil", func(t *testing.T) {
-		assert.Panics(t, func() {
-			_ = defaults.Set(nil)
-		})
+		assert.EqualError(t, defaults.Set(nil), "not a struct pointer")
 	})
 
 	t.Run("typed nil pointer", func(t *testing.T) {
-		assert.Panics(t, func() {
-			_ = defaults.Set((*sample)(nil))
-		})
+		assert.EqualError(t, defaults.Set((*sample)(nil)), "not a struct pointer")
 	})
 }
 
