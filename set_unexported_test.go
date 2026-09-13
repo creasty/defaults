@@ -9,6 +9,15 @@ import (
 	"github.com/creasty/defaults"
 )
 
+// unexportedCounter counts its setter's calls. It is package-level only because it needs a method.
+type unexportedCounter struct {
+	Calls int
+}
+
+func (s *unexportedCounter) SetDefaults() {
+	s.Calls++
+}
+
 // TestSet_UnexportedScalarFieldIsSkipped pins that an unexported field is untouched even with a tag
 // (reflect cannot set it), and that its presence does not stop its exported siblings.
 func TestSet_UnexportedScalarFieldIsSkipped(t *testing.T) {
@@ -48,4 +57,18 @@ func TestSet_UnexportedCompositeFieldsAreSkippedWholesale(t *testing.T) {
 	assert.Nil(t, got.hiddenPtr, "not even an explicit tag allocates it")
 	assert.Empty(t, got.hiddenMap["a"].Name)
 	assert.Empty(t, got.hiddenSl[0].Name)
+}
+
+// TestSet_UnexportedEmbeddedStructIsSkippedWholesale pins that the setter goes unapplied along with
+// the tags when the unexported field is embedded. Go promotes the embedded type's SetDefaults to the
+// struct that embeds it, and Set used to call it through the struct: the one part of an unexported
+// field that Set reached at all.
+func TestSet_UnexportedEmbeddedStructIsSkippedWholesale(t *testing.T) {
+	var got struct {
+		unexportedCounter
+	}
+
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Zero(t, got.Calls, "no more than an unexported named field gets")
 }
