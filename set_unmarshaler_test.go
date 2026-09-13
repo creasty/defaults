@@ -90,6 +90,30 @@ func (u *umFailingJSON) UnmarshalJSON([]byte) error {
 	return errors.New("always fails")
 }
 
+// umFailingBoth implements both interfaces and rejects everything, each with an error of its own,
+// so a test can tell whose rejection is reported.
+type umFailingBoth int
+
+func (u *umFailingBoth) UnmarshalText([]byte) error {
+	return errors.New("text fails")
+}
+
+func (u *umFailingBoth) UnmarshalJSON([]byte) error {
+	return errors.New("json fails")
+}
+
+// umDuration wraps a duration to give it a text format, which makes it struct-kinded: parsing by
+// kind hands its tag to encoding/json.
+type umDuration struct {
+	time.Duration
+}
+
+func (d *umDuration) UnmarshalText(text []byte) error {
+	var err error
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
+}
+
 func TestSet_TextUnmarshaler(t *testing.T) {
 	type sample struct {
 		IP net.IP `default:"10.0.0.1"`
@@ -195,7 +219,9 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 }
 
 // TestSet_FailingUnmarshalerFallsBackToKind covers what happens when the type's own unmarshaler
-// rejects the value: the error is not reported, and the value is parsed by kind instead.
+// rejects the value: the value is parsed by kind instead, and when that succeeds, the rejection
+// goes unreported. When it fails too, the rejection is what Set reports; that is
+// TestSet_FailingUnmarshalerErrorIsReported.
 func TestSet_FailingUnmarshalerFallsBackToKind(t *testing.T) {
 	type sample struct {
 		Text umFailingText `default:"hello"`
@@ -207,6 +233,42 @@ func TestSet_FailingUnmarshalerFallsBackToKind(t *testing.T) {
 
 	assert.Equal(t, umFailingText("hello"), got.Text, "parsed as a string after UnmarshalText failed")
 	assert.Equal(t, umFailingJSON(5), got.JSON, "parsed as an int after UnmarshalJSON failed")
+}
+
+// TestSet_FailingUnmarshalerErrorIsReported covers a tag the type's own unmarshaler rejects and
+// parsing by kind cannot take either. The error Set returns names that rejection as its cause.
+// For a type that implements both interfaces, the tag goes to UnmarshalText first, so its
+// rejection is the one named.
+//
+// The cause used to be the failed parse by kind, because the rejection was discarded. For a
+// struct-kinded type, that was a syntax error from encoding/json, a parser the tag was never
+// written for. See https://github.com/creasty/defaults/issues/79.
+func TestSet_FailingUnmarshalerErrorIsReported(t *testing.T) {
+	type textOnly struct {
+		Timeout umDuration `default:"garbage"`
+	}
+	type jsonOnly struct {
+		Level umFailingJSON `default:"x"`
+	}
+	type both struct {
+		Level umFailingBoth `default:"x"`
+	}
+
+	tests := []struct {
+		name string
+		ptr  interface{}
+		want string
+	}{
+		{"text", &textOnly{}, `field Timeout: invalid default "garbage": time: invalid duration "garbage"`},
+		{"JSON", &jsonOnly{}, `field Level: invalid default "x": always fails`},
+		{"both", &both{}, `field Level: invalid default "x": text fails`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.EqualError(t, defaults.Set(tt.ptr), tt.want)
+		})
+	}
 }
 
 // TestSet_EmptyContainerTagsAndJSONUnmarshaler pins which empty-container tags reach a custom
@@ -284,7 +346,11 @@ func TestSet_TimeTime(t *testing.T) {
 			At time.Time `default:"nonsense"`
 		}{}
 
-		require.Error(t, defaults.Set(&got))
+		err := defaults.Set(&got)
+
+		require.Error(t, err)
+		var parseErr *time.ParseError
+		assert.ErrorAs(t, err, &parseErr, "the cause is UnmarshalText's rejection, not the JSON fall-back's")
 		assert.True(t, got.At.IsZero())
 	})
 }

@@ -89,17 +89,6 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
 
-	// parseErr turns a failed parse into the error Set returns, with one exception: an empty tag asks
-	// for this type's zero value rather than for anything to be parsed, so there is nothing to report
-	// and the field keeps the value it already has.
-	parseErr := func(err error) error {
-		if defaultVal == "" {
-			return nil
-		}
-
-		return fmt.Errorf("field %s: invalid default %q: %w", tag.fieldName, defaultVal, err)
-	}
-
 	if !field.CanSet() {
 		return nil
 	}
@@ -125,8 +114,27 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			pending = &pendingDefault{typ: field.Type(), value: defaultVal, outer: pending}
 		}
 
-		if unmarshalByInterface(field, defaultVal) {
+		unmarshaled, unmarshalErr := unmarshalByInterface(field, defaultVal)
+		if unmarshaled {
 			return nil
+		}
+
+		// parseErr turns a failed parse into the error Set returns, with one exception: an empty tag
+		// asks for this type's zero value rather than for anything to be parsed, so there is nothing to
+		// report and the field keeps the value it already has.
+		//
+		// When the type's own unmarshaler rejected the tag, its error is the cause reported. Parsing by
+		// kind was only the fall-back, and its failure names a parser the tag was never written for:
+		// encoding/json, for a struct. See https://github.com/creasty/defaults/issues/79.
+		parseErr := func(err error) error {
+			if defaultVal == "" {
+				return nil
+			}
+			if unmarshalErr != nil {
+				err = unmarshalErr
+			}
+
+			return fmt.Errorf("field %s: invalid default %q: %w", tag.fieldName, defaultVal, err)
 		}
 
 		switch field.Kind() {
@@ -311,22 +319,32 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 	return nil
 }
 
-func unmarshalByInterface(field reflect.Value, defaultVal string) bool {
+// unmarshalByInterface offers the tag to the field's own unmarshalers ahead of parsing by kind,
+// and reports whether one took it. When none did, the error is the rejection that setField
+// reports if parsing by kind fails too, or nil when neither unmarshaler was offered the tag.
+func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) {
+	var textErr, jsonErr error
+
 	asText, ok := field.Addr().Interface().(encoding.TextUnmarshaler)
 	if ok && defaultVal != "" {
 		// if field implements encode.TextUnmarshaler, try to use it before decode by kind
-		if err := asText.UnmarshalText([]byte(defaultVal)); err == nil {
-			return true
+		if textErr = asText.UnmarshalText([]byte(defaultVal)); textErr == nil {
+			return true, nil
 		}
 	}
 	asJSON, ok := field.Addr().Interface().(json.Unmarshaler)
 	if ok && defaultVal != "" && defaultVal != "{}" && defaultVal != "[]" {
 		// if field implements json.Unmarshaler, try to use it before decode by kind
-		if err := asJSON.UnmarshalJSON([]byte(defaultVal)); err == nil {
-			return true
+		if jsonErr = asJSON.UnmarshalJSON([]byte(defaultVal)); jsonErr == nil {
+			return true, nil
 		}
 	}
-	return false
+
+	// UnmarshalText is offered the tag first, so if both rejected it, its rejection is reported.
+	if textErr != nil {
+		return false, textErr
+	}
+	return false, jsonErr
 }
 
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
