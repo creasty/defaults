@@ -66,9 +66,9 @@ func (s *setterOuter) SetDefaults() {
 	}
 }
 
-// setterLevel is a non-struct type with a setter. It is the one shape whose setter is invoked only
-// by the pointer branch of setField, because the struct recursion never sees it — so a change there
-// that looks redundant would silently stop calling it. See
+// setterLevel is a non-struct type with a setter. The struct recursion never reaches it, so behind a
+// pointer its only call is the one the pointer branch of setField makes itself — the call that is
+// redundant for a struct, and skipped for one, but cannot be dropped outright. See
 // https://github.com/creasty/defaults/issues/67.
 type setterLevel int
 
@@ -180,14 +180,11 @@ func TestSetter_EmbeddedPointerStruct(t *testing.T) {
 	assert.Equal(t, 1, got.InnerInt, "the embedded pointer is allocated and its setter runs too")
 }
 
-// TestSetter_InvocationCount pins how many times Set calls a setter for each shape. A pointer field
-// gets two calls — once from the Set recursion, once from the pointer branch that wraps it — which
-// is why a SetDefaults implementation has to be idempotent, and why the README recommends guarding
-// it with CanUpdate.
+// TestSetter_InvocationCount pins how many times Set calls a setter for each shape below: once.
 //
-// QUIRK: the double call is not by design, just how the recursion falls out — the pointer branch of
-// setField calls the setter after the recursion that already called it. See
-// https://github.com/creasty/defaults/issues/67.
+// A struct behind a pointer used to get a second call, from the pointer branch of setField after the
+// recursion into the struct had already made one, so a setter that was not idempotent applied
+// itself twice. See https://github.com/creasty/defaults/issues/67.
 func TestSetter_InvocationCount(t *testing.T) {
 	t.Run("root", func(t *testing.T) {
 		var got setterCounter
@@ -215,13 +212,34 @@ func TestSetter_InvocationCount(t *testing.T) {
 		require.NoError(t, defaults.Set(&got))
 
 		require.NotNil(t, got.Ptr)
-		assert.Equal(t, 2, got.Ptr.Calls)
+		assert.Equal(t, 1, got.Ptr.Calls)
+	})
+
+	t.Run("pointer field the caller allocated", func(t *testing.T) {
+		got := struct {
+			Ptr *setterCounter
+		}{Ptr: &setterCounter{}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, 1, got.Ptr.Calls)
 	})
 
 	t.Run("slice element", func(t *testing.T) {
 		got := struct {
 			Slice []setterCounter
 		}{Slice: []setterCounter{{}}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.Len(t, got.Slice, 1)
+		assert.Equal(t, 1, got.Slice[0].Calls)
+	})
+
+	t.Run("slice element behind a pointer", func(t *testing.T) {
+		got := struct {
+			Slice []*setterCounter
+		}{Slice: []*setterCounter{{}}}
 
 		require.NoError(t, defaults.Set(&got))
 
@@ -275,7 +293,7 @@ func TestSetter_CalledOnPointerToNonStruct(t *testing.T) {
 }
 
 // TestSetter_RunsAgainOnASecondSet pins that Set is not idempotent as far as setters go: calling it
-// twice calls them twice over, which is the other half of why a setter has to be idempotent itself.
+// twice calls them twice over, which is why a setter has to be idempotent itself.
 func TestSetter_RunsAgainOnASecondSet(t *testing.T) {
 	var got struct {
 		Value setterCounter
@@ -287,5 +305,5 @@ func TestSetter_RunsAgainOnASecondSet(t *testing.T) {
 
 	require.NotNil(t, got.Ptr)
 	assert.Equal(t, 2, got.Value.Calls)
-	assert.Equal(t, 4, got.Ptr.Calls)
+	assert.Equal(t, 2, got.Ptr.Calls)
 }

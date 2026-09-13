@@ -142,6 +142,11 @@ func TestSet_TextUnmarshalerWinsOverJSON(t *testing.T) {
 // SetDefaults is reached only through that recursion -- so the setter never runs for this field.
 // The root's own SetDefaults is unaffected, because Set calls it directly; that is
 // TestSetter_CalledOnRoot.
+//
+// A pointer field used to be the exception. The pointer branch of setField called the setter
+// itself once the recursion returned, so it ran after UnmarshalText regardless; that call was the
+// duplicate in https://github.com/creasty/defaults/issues/67, and removing it brought the pointer
+// into line.
 func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 	t.Run("with a value to unmarshal", func(t *testing.T) {
 		got := struct {
@@ -161,6 +166,17 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 		require.NoError(t, defaults.Set(&got))
 
 		assert.Equal(t, "+setter", got.Value.Via, "nothing to unmarshal, so the setter is reached")
+	})
+
+	t.Run("behind a pointer", func(t *testing.T) {
+		got := struct {
+			Value *umTextAndSetter `default:"x"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Value)
+		assert.Equal(t, "text:x", got.Value.Via, "UnmarshalText ran and SetDefaults did not")
 	})
 }
 
