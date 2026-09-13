@@ -76,7 +76,12 @@ func set(ptr interface{}, pending *pendingDefault) error {
 			return err
 		}
 	}
-	callSetter(ptr)
+
+	// A SetDefaults promoted from an embedded field is that field's, and the loop above has dealt with
+	// it there, just as for a named field. Calling it through the struct as well would run it again.
+	if s, ok := ptr.(Setter); ok && !hasPromotedSetter(t) {
+		s.SetDefaults()
+	}
 	return nil
 }
 
@@ -254,8 +259,8 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			}
 
 			// A struct pointee's setter is not called here: Set has called it as the recursion
-			// finished, or skipped it because an unmarshaler took the tag. Anything else behind a
-			// pointer gets no setter call but this one.
+			// finished, or skipped it because it is promoted or because an unmarshaler took the tag.
+			// Anything else behind a pointer gets no setter call but this one.
 			if field.Elem().Kind() != reflect.Struct {
 				callSetter(field.Interface())
 			}
