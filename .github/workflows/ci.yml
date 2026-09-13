@@ -1,3 +1,5 @@
+name: ci
+
 on:
   push:
     branches:
@@ -44,6 +46,17 @@ jobs:
           files: ./coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+  # The check for the branch rule to require: the matrix's names change with its Go versions.
+  test-ok:
+    needs: test
+    # A skipped job reports success, so this runs even when the matrix fails or is cancelled.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "$RESULT" = success
+        env:
+          RESULT: ${{ needs.test.result }}
 
   lint:
     runs-on: ubuntu-latest
