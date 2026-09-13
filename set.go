@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-var (
-	errInvalidType = errors.New("not a struct pointer")
-)
+// ErrInvalidType is the error Set returns, and MustSet panics with, when the argument is not a
+// non-nil pointer to a struct. Test for it with errors.Is.
+var ErrInvalidType = errors.New("not a struct pointer")
 
 const (
 	fieldName = "default"
@@ -39,7 +39,7 @@ type pendingDefault struct {
 
 // Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
-// `ptr` should be a struct pointer
+// `ptr` should be a non-nil struct pointer, or Set returns ErrInvalidType.
 func Set(ptr interface{}) error {
 	return set(ptr, nil)
 }
@@ -52,14 +52,14 @@ func set(ptr interface{}, pending *pendingDefault) error {
 	// https://github.com/creasty/defaults/issues/69.
 	v := reflect.ValueOf(ptr)
 	if v.Kind() != reflect.Pointer || v.IsNil() {
-		return errInvalidType
+		return ErrInvalidType
 	}
 
 	v = v.Elem()
 	t := v.Type()
 
 	if t.Kind() != reflect.Struct {
-		return errInvalidType
+		return ErrInvalidType
 	}
 
 	for i := 0; i < t.NumField(); i++ {
