@@ -29,10 +29,24 @@ type fieldTag struct {
 	present   bool
 }
 
+// pendingDefault is a tag being applied to a zero value further up the current path, linked to the
+// one being applied above it.
+type pendingDefault struct {
+	typ   reflect.Type
+	value string
+	outer *pendingDefault
+}
+
 // Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
 func Set(ptr interface{}) error {
+	return set(ptr, nil)
+}
+
+// set is Set, for a struct that may be reached by recursion and so carries the tags still being
+// applied above it.
+func set(ptr interface{}, pending *pendingDefault) error {
 	// The kind is read off the Value because reflect.TypeOf(nil) is itself nil, and a nil pointer
 	// has no struct behind it to fill: its Elem is an invalid Value, which has no Type. See
 	// https://github.com/creasty/defaults/issues/69.
@@ -58,7 +72,7 @@ func Set(ptr interface{}) error {
 			fieldName: t.Field(i).Name,
 			value:     defaultVal,
 			present:   ok,
-		}); err != nil {
+		}, pending); err != nil {
 			return err
 		}
 	}
@@ -66,7 +80,7 @@ func Set(ptr interface{}) error {
 	return nil
 }
 
-func setField(field reflect.Value, tag fieldTag) error {
+func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error {
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
 
@@ -91,6 +105,21 @@ func setField(field reflect.Value, tag fieldTag) error {
 
 	isInitial := isInitialValue(field)
 	if isInitial {
+		// What a tag makes of a zero value depends on nothing but the value's type and the tag. So
+		// meeting the same pair below where it is already being applied means meeting it again below
+		// that, without end: a default that creates another of itself, which used to recurse until
+		// the stack overflowed. A value that is not zero never counts, since what happens below it
+		// depends on what it holds, and that is how a recursive type ends. See
+		// https://github.com/creasty/defaults/issues/71.
+		if tag.present {
+			for p := pending; p != nil; p = p.outer {
+				if p.typ == field.Type() && p.value == defaultVal {
+					return fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, defaultVal)
+				}
+			}
+			pending = &pendingDefault{typ: field.Type(), value: defaultVal, outer: pending}
+		}
+
 		if unmarshalByInterface(field, defaultVal) {
 			return nil
 		}
@@ -220,7 +249,7 @@ func setField(field reflect.Value, tag fieldTag) error {
 	switch field.Kind() {
 	case reflect.Pointer:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			if err := setField(field.Elem(), tag); err != nil {
+			if err := setField(field.Elem(), tag, pending); err != nil {
 				return err
 			}
 
@@ -232,12 +261,12 @@ func setField(field reflect.Value, tag fieldTag) error {
 			}
 		}
 	case reflect.Struct:
-		if err := Set(field.Addr().Interface()); err != nil {
+		if err := set(field.Addr().Interface(), pending); err != nil {
 			return err
 		}
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			if err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}); err != nil {
+			if err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
 				return err
 			}
 		}
@@ -263,7 +292,7 @@ func setField(field reflect.Value, tag fieldTag) error {
 					v = copyValue.Elem()
 				}
 
-				if err := setField(v, fieldTag{fieldName: tag.fieldName}); err != nil {
+				if err := setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
 					return err
 				}
 
