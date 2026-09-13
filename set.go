@@ -256,6 +256,14 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			}
 		case reflect.Pointer:
 			field.Set(reflect.New(field.Type().Elem()))
+		default:
+			// The kinds left, an array or a complex number among them, are not parsed at all, so a
+			// tag the type's own unmarshaler rejected has nothing to fall back to. The rejection is
+			// reported rather than dropped, which would leave a zero value that looks legitimate:
+			// the nil UUID, for uuid.UUID. See https://github.com/creasty/defaults/issues/89.
+			if unmarshalErr != nil {
+				return parseErr(unmarshalErr)
+			}
 		}
 	}
 
@@ -321,7 +329,8 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 
 // unmarshalByInterface offers the tag to the field's own unmarshalers ahead of parsing by kind,
 // and reports whether one took it. When none did, the error is the rejection that setField
-// reports if parsing by kind fails too, or nil when neither unmarshaler was offered the tag.
+// reports unless parsing by kind takes the tag instead, or nil when neither unmarshaler was
+// offered the tag.
 func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) {
 	var textErr, jsonErr error
 
