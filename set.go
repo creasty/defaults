@@ -223,7 +223,13 @@ func setField(field reflect.Value, tag fieldTag) error {
 			if err := setField(field.Elem(), tag); err != nil {
 				return err
 			}
-			callSetter(field.Interface())
+
+			// A struct pointee's setter is not called here: Set has called it as the recursion
+			// finished, or skipped it because an unmarshaler took the tag. Anything else behind a
+			// pointer gets no setter call but this one.
+			if field.Elem().Kind() != reflect.Struct {
+				callSetter(field.Interface())
+			}
 		}
 	case reflect.Struct:
 		if err := Set(field.Addr().Interface()); err != nil {
