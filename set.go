@@ -169,9 +169,13 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			}
 			field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
 		case reflect.Int64:
-			// The duration attempt tolerates surrounding whitespace. Doing it here rather than
-			// against time.Duration's exact type covers named duration types too, and leaves the
-			// numeric fallback strict.
+			// Every int64-kinded field is offered to time.ParseDuration, because reflection cannot
+			// tell a named duration type from any other int64: matching time.Duration's exact type
+			// would leave those types behind. So a plain int64 takes "1h" too, and a bare "1" on a
+			// Duration is 1ns, as the README documents. See
+			// https://github.com/creasty/defaults/issues/66.
+			//
+			// The duration attempt tolerates surrounding whitespace, the numeric fallback does not.
 			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else if val, err := strconv.ParseInt(defaultVal, 0, 64); err == nil {

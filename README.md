@@ -82,6 +82,33 @@ type Feature struct {
 gets its value from a `SetDefaults` method instead of a tag.
 
 
+## Durations
+
+A `time.Duration` takes anything [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration)
+accepts, such as `default:"30s"` or `default:"1h30m"`, and so does a type defined from it.
+
+`time.Duration` is an `int64` underneath, and every field that is an `int64` underneath is parsed
+the same way: `time.Duration`, a type defined from it, and a plain `int64` all take both a duration
+string and a bare integer.
+
+```go
+type Job struct {
+	Timeout time.Duration `default:"1"`  // 1ns, not 1s
+	Retries int64         `default:"5m"` // 300000000000, not an error
+}
+```
+
+Write the unit on a duration, and don't count on `Set` to reject a duration on a plain `int64`. An
+integer that is not an `int64` underneath does reject one: on an `int` or an `int32`,
+`default:"5m"` is an error.
+
+This is deliberate. Reflection cannot tell a type defined from `time.Duration` from any other
+`int64`: such a type inherits none of `time.Duration`'s methods and keeps no trace of where it came
+from. Only `time.Duration` itself can be singled out, and parsing durations for it alone would leave
+every type defined from it unable to take `"10s"`. See
+[#66](https://github.com/creasty/defaults/issues/66).
+
+
 ## Design principles
 
 **Keep it simple.** The scope is narrow by design — read a tag, fill a field — and is meant to stay
