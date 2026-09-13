@@ -3,6 +3,7 @@ package defaults_test
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net"
 	"strconv"
 	"testing"
@@ -114,6 +115,23 @@ func (d *umDuration) UnmarshalText(text []byte) error {
 	return err
 }
 
+// umEndpoint has a text form, "host:port", as well as tags on its fields: the shape of a config
+// type that can be given as one string or filled in field by field.
+type umEndpoint struct {
+	Host string `default:"localhost"`
+	Port int    `default:"8080"`
+}
+
+func (e *umEndpoint) UnmarshalText(text []byte) error {
+	host, port, err := net.SplitHostPort(string(text))
+	if err != nil {
+		return err
+	}
+	e.Host = host
+	e.Port, err = strconv.Atoi(port)
+	return err
+}
+
 func TestSet_TextUnmarshaler(t *testing.T) {
 	type sample struct {
 		IP net.IP `default:"10.0.0.1"`
@@ -222,17 +240,51 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 // rejects the value: the value is parsed by kind instead, and when that succeeds, the rejection
 // goes unreported. When it fails too, the rejection is what Set reports; that is
 // TestSet_FailingUnmarshalerErrorIsReported.
+//
+// The first subtest shows the fall-back with types that reject every value. The others pin tags
+// in real use that work only because of it, and that is why it is kept: they all fail if the
+// rejection is reported straight away instead, the second option in
+// https://github.com/creasty/defaults/issues/79.
 func TestSet_FailingUnmarshalerFallsBackToKind(t *testing.T) {
-	type sample struct {
-		Text umFailingText `default:"hello"`
-		JSON umFailingJSON `default:"5"`
-	}
+	t.Run("types that reject every value", func(t *testing.T) {
+		type sample struct {
+			Text umFailingText `default:"hello"`
+			JSON umFailingJSON `default:"5"`
+		}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		var got sample
+		require.NoError(t, defaults.Set(&got))
 
-	assert.Equal(t, umFailingText("hello"), got.Text, "parsed as a string after UnmarshalText failed")
-	assert.Equal(t, umFailingJSON(5), got.JSON, "parsed as an int after UnmarshalJSON failed")
+		assert.Equal(t, umFailingText("hello"), got.Text, "parsed as a string after UnmarshalText failed")
+		assert.Equal(t, umFailingJSON(5), got.JSON, "parsed as an int after UnmarshalJSON failed")
+	})
+
+	t.Run("an empty object allocates a pointer to a type with a text form", func(t *testing.T) {
+		got := struct {
+			Endpoint *umEndpoint `default:"{}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Endpoint)
+		assert.Equal(t, umEndpoint{Host: "localhost", Port: 8080}, *got.Endpoint,
+			"UnmarshalText rejects {}, so the pointer is allocated and its fields get their own tags")
+	})
+
+	t.Run("a number sets a slog.Level, whose unmarshalers take names", func(t *testing.T) {
+		// Checked first, since a Go release that taught either of them numbers would leave nothing
+		// here for the fall-back to do, and this subtest unable to fail.
+		require.Error(t, new(slog.Level).UnmarshalText([]byte("4")))
+		require.Error(t, new(slog.Level).UnmarshalJSON([]byte("4")))
+
+		got := struct {
+			Level slog.Level `default:"4"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, slog.LevelWarn, got.Level, "parsed as an int after both unmarshalers rejected it")
+	})
 }
 
 // TestSet_FailingUnmarshalerErrorIsReported covers a tag the type's own unmarshaler rejects and
