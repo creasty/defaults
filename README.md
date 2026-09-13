@@ -61,7 +61,9 @@ and [the package example](https://pkg.go.dev/github.com/creasty/defaults#example
 composite cases in one program.
 
 
-## Zero values
+## Behavior
+
+### Zero values
 
 A field is written only while it still holds its type's zero value. No scalar type can tell an
 unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool` is
@@ -81,15 +83,11 @@ type Feature struct {
 `default:"-"` opts a field out entirely: it is neither parsed nor recursed into. That is how a field
 gets its value from a `SetDefaults` method instead of a tag.
 
-
-## Durations
+### Durations
 
 A `time.Duration` takes anything [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration)
-accepts, such as `default:"30s"` or `default:"1h30m"`, and so does a type defined from it.
-
-`time.Duration` is an `int64` underneath, and every field that is an `int64` underneath is parsed
-the same way: `time.Duration`, a type defined from it, and a plain `int64` all take both a duration
-string and a bare integer.
+accepts. Every field that is an `int64` underneath is parsed the same way, though, so a
+`time.Duration` takes a bare integer and a plain `int64` takes a duration string:
 
 ```go
 type Job struct {
@@ -98,15 +96,8 @@ type Job struct {
 }
 ```
 
-Write the unit on a duration, and don't count on `Set` to reject a duration on a plain `int64`. An
-integer that is not an `int64` underneath does reject one: on an `int` or an `int32`,
-`default:"5m"` is an error.
-
-This is deliberate. Reflection cannot tell a type defined from `time.Duration` from any other
-`int64`: such a type inherits none of `time.Duration`'s methods and keeps no trace of where it came
-from. Only `time.Duration` itself can be singled out, and parsing durations for it alone would leave
-every type defined from it unable to take `"10s"`. See
-[#66](https://github.com/creasty/defaults/issues/66).
+This is deliberate: a type defined from `time.Duration` keeps no trace of it at runtime, so parsing
+durations only for `time.Duration` itself would stop such types from taking `"10s"`.
 
 
 ## Design principles
