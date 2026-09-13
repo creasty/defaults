@@ -143,7 +143,8 @@ func TestSet_SliceOfScalarsIsLeftAlone(t *testing.T) {
 
 // TestSet_ArraysAreLeftAlone pins that reflect.Array has no case in setField, which makes an array
 // behave unlike the slice of the same element type: its tag is dropped without an error, and its
-// elements are not descended into.
+// elements are not descended into. Only a tag that the array type's own unmarshaler rejects is an
+// error; that is TestSet_FailingUnmarshalerWithNothingToFallBackTo.
 func TestSet_ArraysAreLeftAlone(t *testing.T) {
 	type inner struct {
 		Name string `default:"inner"`

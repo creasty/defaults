@@ -1,6 +1,7 @@
 package defaults_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -132,6 +133,33 @@ func (e *umEndpoint) UnmarshalText(text []byte) error {
 	return err
 }
 
+// umHexID is a fixed-size identifier with a hex text form, the shape of uuid.UUID. It is
+// array-kinded, and setField does not parse an array by kind, so a tag UnmarshalText rejects has
+// nothing to fall back to.
+type umHexID [4]byte
+
+func (id *umHexID) UnmarshalText(text []byte) error {
+	if len(text) != hex.EncodedLen(len(id)) {
+		return errors.New("invalid ID length")
+	}
+	_, err := hex.Decode(id[:], text)
+	return err
+}
+
+// umFailingJSONArray always fails, and is array-kinded, so there is nothing to fall back to.
+type umFailingJSONArray [2]int
+
+func (u *umFailingJSONArray) UnmarshalJSON([]byte) error {
+	return errors.New("always fails")
+}
+
+// umFailingComplex always fails, and is complex-kinded, another kind setField does not parse.
+type umFailingComplex complex128
+
+func (u *umFailingComplex) UnmarshalText([]byte) error {
+	return errors.New("always fails")
+}
+
 func TestSet_TextUnmarshaler(t *testing.T) {
 	type sample struct {
 		IP net.IP `default:"10.0.0.1"`
@@ -153,6 +181,20 @@ func TestSet_TextUnmarshalerPointer(t *testing.T) {
 
 	require.NotNil(t, got.IP)
 	assert.True(t, got.IP.Equal(net.ParseIP("10.0.0.1")), "got %v", got.IP)
+}
+
+// TestSet_TextUnmarshalerArray covers an array type with a text form, the shape of uuid.UUID.
+// setField does not parse an array by kind, but the tag is offered to UnmarshalText before the
+// kind is looked at, so it fills the field all the same.
+func TestSet_TextUnmarshalerArray(t *testing.T) {
+	type sample struct {
+		ID umHexID `default:"0a1b2c3d"`
+	}
+
+	var got sample
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Equal(t, umHexID{0x0a, 0x1b, 0x2c, 0x3d}, got.ID)
 }
 
 func TestSet_JSONUnmarshaler(t *testing.T) {
@@ -314,6 +356,47 @@ func TestSet_FailingUnmarshalerErrorIsReported(t *testing.T) {
 		{"text", &textOnly{}, `field Timeout: invalid default "garbage": time: invalid duration "garbage"`},
 		{"JSON", &jsonOnly{}, `field Level: invalid default "x": always fails`},
 		{"both", &both{}, `field Level: invalid default "x": text fails`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.EqualError(t, defaults.Set(tt.ptr), tt.want)
+		})
+	}
+}
+
+// TestSet_FailingUnmarshalerWithNothingToFallBackTo covers a tag the type's own unmarshaler
+// rejects when setField does not parse the type's kind at all: an array, as uuid.UUID is, or a
+// complex number. There is no parse to fail, but the rejection is reported just as it is when one
+// fails; that is TestSet_FailingUnmarshalerErrorIsReported. A type with no unmarshaler has no
+// rejection to report, so its tag is still ignored; that is TestSet_ArraysAreLeftAlone.
+//
+// The rejection used to be dropped. The field kept its zero value and Set returned nil, leaving a
+// value that looks legitimate for the types this hits: the nil UUID, or an all-zero hash. See
+// https://github.com/creasty/defaults/issues/89.
+func TestSet_FailingUnmarshalerWithNothingToFallBackTo(t *testing.T) {
+	type array struct {
+		ID umHexID `default:"not-an-id"`
+	}
+	type pointer struct {
+		ID *umHexID `default:"not-an-id"`
+	}
+	type jsonOnly struct {
+		Pair umFailingJSONArray `default:"x"`
+	}
+	type complexNumber struct {
+		Value umFailingComplex `default:"x"`
+	}
+
+	tests := []struct {
+		name string
+		ptr  interface{}
+		want string
+	}{
+		{"array", &array{}, `field ID: invalid default "not-an-id": invalid ID length`},
+		{"pointer", &pointer{}, `field ID: invalid default "not-an-id": invalid ID length`},
+		{"JSON", &jsonOnly{}, `field Pair: invalid default "x": always fails`},
+		{"complex", &complexNumber{}, `field Value: invalid default "x": always fails`},
 	}
 
 	for _, tt := range tests {

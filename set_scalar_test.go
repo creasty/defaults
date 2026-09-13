@@ -389,7 +389,8 @@ func TestSet_EmptyTag(t *testing.T) {
 }
 
 // TestSet_UnsupportedKindsAreIgnored pins that kinds setField has no case for are left alone, tag
-// or no tag, without an error.
+// or no tag, without an error. Only a tag that a type's own unmarshaler rejects is an error; that
+// is TestSet_FailingUnmarshalerWithNothingToFallBackTo.
 func TestSet_UnsupportedKindsAreIgnored(t *testing.T) {
 	type sample struct {
 		Iface   interface{} `default:"1"`
