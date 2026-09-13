@@ -27,7 +27,7 @@ func TestMustSet_PanicsForNonPointer(t *testing.T) {
 		String string `default:"hello"`
 	}
 
-	assert.PanicsWithError(t, "not a struct pointer", func() {
+	assert.PanicsWithValue(t, defaults.ErrInvalidType, func() {
 		defaults.MustSet(sample{})
 	})
 }
@@ -35,7 +35,7 @@ func TestMustSet_PanicsForNonPointer(t *testing.T) {
 func TestMustSet_PanicsForPointerToNonStruct(t *testing.T) {
 	number := 1
 
-	assert.PanicsWithError(t, "not a struct pointer", func() {
+	assert.PanicsWithValue(t, defaults.ErrInvalidType, func() {
 		defaults.MustSet(&number)
 	})
 }
@@ -49,13 +49,13 @@ func TestMustSet_PanicsForNil(t *testing.T) {
 	}
 
 	t.Run("untyped nil", func(t *testing.T) {
-		assert.PanicsWithError(t, "not a struct pointer", func() {
+		assert.PanicsWithValue(t, defaults.ErrInvalidType, func() {
 			defaults.MustSet(nil)
 		})
 	})
 
 	t.Run("typed nil pointer", func(t *testing.T) {
-		assert.PanicsWithError(t, "not a struct pointer", func() {
+		assert.PanicsWithValue(t, defaults.ErrInvalidType, func() {
 			defaults.MustSet((*sample)(nil))
 		})
 	})

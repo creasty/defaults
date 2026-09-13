@@ -34,10 +34,7 @@ func TestSet_RejectsNonStructPointer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := defaults.Set(tt.arg)
-
-			require.Error(t, err)
-			assert.EqualError(t, err, "not a struct pointer")
+			assert.ErrorIs(t, defaults.Set(tt.arg), defaults.ErrInvalidType)
 		})
 	}
 }
@@ -53,12 +50,19 @@ func TestSet_RejectsNil(t *testing.T) {
 	}
 
 	t.Run("untyped nil", func(t *testing.T) {
-		assert.EqualError(t, defaults.Set(nil), "not a struct pointer")
+		assert.ErrorIs(t, defaults.Set(nil), defaults.ErrInvalidType)
 	})
 
 	t.Run("typed nil pointer", func(t *testing.T) {
-		assert.EqualError(t, defaults.Set((*sample)(nil)), "not a struct pointer")
+		assert.ErrorIs(t, defaults.Set((*sample)(nil)), defaults.ErrInvalidType)
 	})
+}
+
+// TestSet_InvalidTypeKeepsItsMessage pins the message of ErrInvalidType. Until the error was
+// exported, matching on its message was the only way to tell it apart, so code written then may
+// still be doing it. See https://github.com/creasty/defaults/issues/70.
+func TestSet_InvalidTypeKeepsItsMessage(t *testing.T) {
+	assert.EqualError(t, defaults.Set(struct{}{}), "not a struct pointer")
 }
 
 func TestSet_InvalidJSONInTag(t *testing.T) {
