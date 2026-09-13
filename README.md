@@ -61,7 +61,9 @@ and [the package example](https://pkg.go.dev/github.com/creasty/defaults#example
 composite cases in one program.
 
 
-## Zero values
+## Behavior
+
+### Zero values
 
 A field is written only while it still holds its type's zero value. No scalar type can tell an
 unspecified value from its zero value — an `int` left alone is `0`, a `string` is `""`, a `bool` is
@@ -80,6 +82,22 @@ type Feature struct {
 
 `default:"-"` opts a field out entirely: it is neither parsed nor recursed into. That is how a field
 gets its value from a `SetDefaults` method instead of a tag.
+
+### Durations
+
+A `time.Duration` takes anything [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration)
+accepts. Every field that is an `int64` underneath is parsed the same way, though, so a
+`time.Duration` takes a bare integer and a plain `int64` takes a duration string:
+
+```go
+type Job struct {
+	Timeout time.Duration `default:"1"`  // 1ns, not 1s
+	Retries int64         `default:"5m"` // 300000000000, not an error
+}
+```
+
+This is deliberate: a type defined from `time.Duration` keeps no trace of it at runtime, so parsing
+durations only for `time.Duration` itself would stop such types from taking `"10s"`.
 
 
 ## Design principles

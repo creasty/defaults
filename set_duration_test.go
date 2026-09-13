@@ -30,13 +30,16 @@ func TestSet_Duration(t *testing.T) {
 
 // TestSet_DurationAndIntegerShareOneParser pins the outcomes of int64-kinded fields being handed to
 // both time.ParseDuration and strconv.ParseInt: a bare number on a Duration is nanoseconds, and a
-// duration string on a plain int64 is its nanosecond count.
+// duration string on a plain int64 is its nanosecond count. The README states both, under
+// Durations, so a change here is a change there.
 //
-// Which parser is tried first is deliberately not asserted, because it is not observable: the two
-// accept disjoint inputs, so swapping them changes nothing.
+// Which parser is tried first is deliberately not asserted, because it is not observable: the only
+// tag both accept is a zero, which is zero either way, so swapping them changes nothing.
 //
 // QUIRK: the parsers are picked by kind, not by type, so int64 and time.Duration cannot be told
-// apart. See https://github.com/creasty/defaults/issues/66.
+// apart. That is kept on purpose: matching time.Duration's exact type is the only alternative, and
+// it would stop a named duration type from parsing, which TestSet_Duration pins as working. See
+// https://github.com/creasty/defaults/issues/66.
 func TestSet_DurationAndIntegerShareOneParser(t *testing.T) {
 	type sample struct {
 		BareNumberOnDuration time.Duration `default:"1"`
