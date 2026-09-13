@@ -9,14 +9,15 @@ import (
 	"github.com/creasty/defaults"
 )
 
-// optOutSetter records whether its setter ran, so a test can tell whether `default:"-"` suppresses
-// the setter along with the tags. It is package-level only because it needs a method.
-type optOutSetter struct {
+// OptOutSetter records whether its setter ran, so a test can tell whether `default:"-"` suppresses
+// the setter along with the tags. It is package-level only because it needs a method, and its name
+// is exported because one test embeds it.
+type OptOutSetter struct {
 	Called bool
 	Name   string `default:"name"`
 }
 
-func (s *optOutSetter) SetDefaults() {
+func (s *OptOutSetter) SetDefaults() {
 	s.Called = true
 }
 
@@ -75,16 +76,33 @@ func TestSet_OptOutSkipsPointer(t *testing.T) {
 
 // TestSet_OptOutSkipsStructRecursionAndSetter covers the reach of `-` on a struct field: it is not
 // descended into, so neither the nested tags nor the nested setter run.
+//
+// An embedded field used to be the exception for the setter. Go promotes the embedded type's
+// SetDefaults to the struct that embeds it, and Set called it through the struct, tag or no tag.
 func TestSet_OptOutSkipsStructRecursionAndSetter(t *testing.T) {
-	type sample struct {
-		Struct optOutSetter `default:"-"`
-	}
+	t.Run("named", func(t *testing.T) {
+		type sample struct {
+			Struct OptOutSetter `default:"-"`
+		}
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		var got sample
+		require.NoError(t, defaults.Set(&got))
 
-	assert.Empty(t, got.Struct.Name, "nested tags are not applied")
-	assert.False(t, got.Struct.Called, "the nested setter is not called either")
+		assert.Empty(t, got.Struct.Name, "nested tags are not applied")
+		assert.False(t, got.Struct.Called, "the nested setter is not called either")
+	})
+
+	t.Run("embedded", func(t *testing.T) {
+		type sample struct {
+			OptOutSetter `default:"-"`
+		}
+
+		var got sample
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, got.Name, "nested tags are not applied")
+		assert.False(t, got.Called, "nor is the setter Go promotes to the struct")
+	})
 }
 
 // TestSet_OptOutDoesNotAffectOwnSetter covers the other side: opting a field out does not opt its

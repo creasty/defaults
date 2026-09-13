@@ -45,18 +45,19 @@ func (u *umJSONRecorder) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// umTextAndSetter implements encoding.TextUnmarshaler and defaults.Setter, and appends to Via as
-// each one runs, so a test can tell "only text ran" from "both ran" whichever order they take.
-type umTextAndSetter struct {
+// UmTextAndSetter implements encoding.TextUnmarshaler and defaults.Setter, and appends to Via as
+// each one runs, so a test can tell "only text ran" from "both ran" whichever order they take. Its
+// name is exported because one test embeds it.
+type UmTextAndSetter struct {
 	Via string
 }
 
-func (u *umTextAndSetter) UnmarshalText(text []byte) error {
+func (u *UmTextAndSetter) UnmarshalText(text []byte) error {
 	u.Via += "text:" + string(text)
 	return nil
 }
 
-func (u *umTextAndSetter) SetDefaults() {
+func (u *UmTextAndSetter) SetDefaults() {
 	u.Via += "+setter"
 }
 
@@ -147,10 +148,13 @@ func TestSet_TextUnmarshalerWinsOverJSON(t *testing.T) {
 // itself once the recursion returned, so it ran after UnmarshalText regardless; that call was the
 // duplicate in https://github.com/creasty/defaults/issues/67, and removing it brought the pointer
 // into line.
+//
+// An embedded field was another. Go promotes the embedded type's SetDefaults to the struct that
+// embeds it, and Set called it through the struct after UnmarshalText had taken the tag.
 func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 	t.Run("with a value to unmarshal", func(t *testing.T) {
 		got := struct {
-			Value umTextAndSetter `default:"x"`
+			Value UmTextAndSetter `default:"x"`
 		}{}
 
 		require.NoError(t, defaults.Set(&got))
@@ -160,7 +164,7 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 
 	t.Run("with an empty tag", func(t *testing.T) {
 		got := struct {
-			Value umTextAndSetter `default:""`
+			Value UmTextAndSetter `default:""`
 		}{}
 
 		require.NoError(t, defaults.Set(&got))
@@ -170,13 +174,23 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 
 	t.Run("behind a pointer", func(t *testing.T) {
 		got := struct {
-			Value *umTextAndSetter `default:"x"`
+			Value *UmTextAndSetter `default:"x"`
 		}{}
 
 		require.NoError(t, defaults.Set(&got))
 
 		require.NotNil(t, got.Value)
 		assert.Equal(t, "text:x", got.Value.Via, "UnmarshalText ran and SetDefaults did not")
+	})
+
+	t.Run("embedded", func(t *testing.T) {
+		got := struct {
+			UmTextAndSetter `default:"x"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "text:x", got.Via, "UnmarshalText ran and SetDefaults did not")
 	})
 }
 
