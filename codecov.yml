@@ -6,7 +6,3 @@ coverage:
     patch:
       default:
         informational: true
-
-# Not part of the library: example/ is a runnable demo.
-ignore:
-  - example/**

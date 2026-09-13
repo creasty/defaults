@@ -57,7 +57,8 @@ $ go get github.com/creasty/defaults
 
 The API is three functions: `Set`, `MustSet` (the same, but panicking), and `CanUpdate`. Runnable
 examples for each are on [pkg.go.dev](https://pkg.go.dev/github.com/creasty/defaults#pkg-examples),
-and [`example/main.go`](./example/main.go) walks the composite cases in one program.
+and [the package example](https://pkg.go.dev/github.com/creasty/defaults#example-package) walks the
+composite cases in one program.
 
 
 ## Zero values
