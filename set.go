@@ -41,6 +41,10 @@ type pendingDefault struct {
 // structs, pointers, slices and maps to do the same below. A field is written only while it holds
 // its zero value, and a nil map, slice or pointer is allocated only by a tag.
 //
+// Set stops at the first field whose default fails and returns its error. A value Set found zero on
+// the way to that default is left zero again, so a second Set fails again; fields filled elsewhere
+// before the failure keep their defaults.
+//
 // ptr should be a non-nil struct pointer, or Set returns ErrInvalidType.
 func Set(ptr interface{}) error {
 	return set(ptr, nil)
@@ -91,9 +95,6 @@ func set(ptr interface{}, pending *pendingDefault) error {
 // UnmarshalJSON took the tag, the field's own or, behind a pointer, its pointee's, which decides
 // whether the pointer above calls a setter.
 func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool, error) {
-	// Kept as a local because the parsing below reads better against a plain name.
-	defaultVal := tag.value
-
 	if !field.CanSet() {
 		return false, nil
 	}
@@ -103,6 +104,25 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool,
 	}
 
 	isInitial := isInitialValue(field)
+	taken, err := fillField(field, tag, isInitial, pending)
+
+	// A value Set found zero is put back to zero if anything below it failed: a pointer or container
+	// the tag allocated, a struct decoded partway, or what an unmarshaler wrote before it rejected the
+	// tag. Left as it was, it would no longer be zero, and a second Set would skip the tag that failed.
+	// This is not a defer in fillField: it has too many returns for the compiler to open-code one, and
+	// the defer it builds instead slows every zero field Set fills.
+	if err != nil && isInitial {
+		field.Set(reflect.Zero(field.Type()))
+	}
+	return taken, err
+}
+
+// fillField is setField for a field it does not leave alone: it applies the tag if isInitial, which
+// reports whether the field is zero, and descends into the field.
+func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault) (bool, error) {
+	// Kept as a local because the parsing below reads better against a plain name.
+	defaultVal := tag.value
+
 	if isInitial {
 		// What a tag makes of a zero value depends on nothing but the value's type and the tag. So
 		// meeting the same pair below where it is already being applied means meeting it again below
