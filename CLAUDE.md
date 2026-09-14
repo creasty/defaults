@@ -21,14 +21,17 @@ stay beside the source, not in a subdirectory: coverage of `.` and the `Example*
 pkg.go.dev renders both depend on the tests living in the package's own directory.
 
 - Declare each test's struct inside the test function. Package-level types only where a method is
-  required (`SetDefaults`, `UnmarshalText`, `UnmarshalJSON`), named with a file-unique prefix.
+  required (`SetDefaults`, `UnmarshalText`, `UnmarshalJSON`), named with a file-unique prefix —
+  except in `example_test.go`, whose types keep the plain names readers see on pkg.go.dev.
 - No package-level `var`s: the suite stays order-independent, which `-shuffle=on` enforces.
 - Keep test structs under ~6 fields, and don't share one across test functions unless it carries a
-  method. The suite this replaced hung every assertion off a single ~120-field struct.
+  method. The suite this replaced hung every assertion off a single ~120-field struct. A struct
+  that lists one field per kind, because each kind has its own parse branch, is the exception.
 - Statement coverage of the package is 100%. Keep it there.
 
 ## Behavior changes
 
 Today's behavior is pinned by tests, including the parts that look wrong — those carry a `// QUIRK`
-or `// BUG` comment with a link. Changing behavior means flipping the pinned test in the same
-commit, so the diff records the decision instead of burying it.
+or `// BUG` comment, with a link to the issue or PR behind it when one exists. Changing behavior
+means flipping the pinned test in the same commit, so the diff records the decision instead of
+burying it.

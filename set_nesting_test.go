@@ -9,88 +9,78 @@ import (
 	"github.com/creasty/defaults"
 )
 
-// NestEmbedded is embedded in nestLeaf, so the containers below also cover an embedded struct
-// reached through them. Exported because an embedded field takes the name of its type, and an
-// unexported one would be beyond reflect's reach.
-type NestEmbedded struct {
-	Depth int `default:"1"`
-}
+// TestSet_NestedContainers covers containers nested inside one another, whether the caller built them
+// or a tag did: the structs at the bottom get their defaults, and so does a struct embedded in them.
+func TestSet_NestedContainers(t *testing.T) {
+	// Embedded is exported because an embedded field takes the name of its type, and an unexported
+	// one would be skipped wholesale, as TestSet_UnexportedCompositeFieldsAreSkippedWholesale pins.
+	type Embedded struct {
+		Depth int `default:"1"`
+	}
+	type leaf struct {
+		Embedded `default:"{}"`
 
-// nestLeaf is the element type of the nested containers below. It is package-level only so the
-// tests can share one shape; it carries no method.
-type nestLeaf struct {
-	NestEmbedded `default:"{}"`
-
-	Name string `default:"leaf"`
-	Kept int
-}
-
-func TestSet_DeepSliceOfStructs(t *testing.T) {
-	type sample struct {
-		Deep [][][]nestLeaf
+		Name string `default:"leaf"`
+		Kept int
 	}
 
-	got := sample{Deep: [][][]nestLeaf{{{{Kept: 123}}}}}
-	require.NoError(t, defaults.Set(&got))
+	filled := leaf{Embedded: Embedded{Depth: 1}, Name: "leaf", Kept: 123}
 
-	assert.Equal(t, [][][]nestLeaf{{{{NestEmbedded: NestEmbedded{Depth: 1}, Name: "leaf", Kept: 123}}}}, got.Deep)
-}
+	t.Run("slice of slice of slice", func(t *testing.T) {
+		got := struct {
+			Deep [][][]leaf
+		}{Deep: [][][]leaf{{{{Kept: 123}}}}}
 
-func TestSet_MapOfMapOfStructs(t *testing.T) {
-	type sample struct {
-		Deep map[string]map[string]nestLeaf
-	}
+		require.NoError(t, defaults.Set(&got))
 
-	got := sample{Deep: map[string]map[string]nestLeaf{
-		"outer": {"inner": {Kept: 123}},
-	}}
-	require.NoError(t, defaults.Set(&got))
+		assert.Equal(t, [][][]leaf{{{filled}}}, got.Deep)
+	})
 
-	assert.Equal(t, map[string]map[string]nestLeaf{
-		"outer": {"inner": {NestEmbedded: NestEmbedded{Depth: 1}, Name: "leaf", Kept: 123}},
-	}, got.Deep)
-}
+	t.Run("map of map", func(t *testing.T) {
+		got := struct {
+			Deep map[string]map[string]leaf
+		}{Deep: map[string]map[string]leaf{
+			"outer": {"inner": {Kept: 123}},
+		}}
 
-func TestSet_SliceOfMapOfSliceOfStructs(t *testing.T) {
-	type sample struct {
-		Deep []map[string][]nestLeaf
-	}
+		require.NoError(t, defaults.Set(&got))
 
-	got := sample{Deep: []map[string][]nestLeaf{
-		{"key": {{Kept: 123}}},
-	}}
-	require.NoError(t, defaults.Set(&got))
+		assert.Equal(t, map[string]map[string]leaf{"outer": {"inner": filled}}, got.Deep)
+	})
 
-	assert.Equal(t, []map[string][]nestLeaf{
-		{"key": {{NestEmbedded: NestEmbedded{Depth: 1}, Name: "leaf", Kept: 123}}},
-	}, got.Deep)
-}
+	t.Run("slice of map of slice", func(t *testing.T) {
+		got := struct {
+			Deep []map[string][]leaf
+		}{Deep: []map[string][]leaf{
+			{"key": {{Kept: 123}}},
+		}}
 
-func TestSet_MapOfSliceOfPointerStructs(t *testing.T) {
-	type sample struct {
-		Deep map[string][]*nestLeaf
-	}
+		require.NoError(t, defaults.Set(&got))
 
-	got := sample{Deep: map[string][]*nestLeaf{
-		"key": {{Kept: 123}},
-	}}
-	require.NoError(t, defaults.Set(&got))
+		assert.Equal(t, []map[string][]leaf{{"key": {filled}}}, got.Deep)
+	})
 
-	require.Len(t, got.Deep["key"], 1)
-	require.NotNil(t, got.Deep["key"][0])
-	assert.Equal(t, nestLeaf{NestEmbedded: NestEmbedded{Depth: 1}, Name: "leaf", Kept: 123}, *got.Deep["key"][0])
-}
+	t.Run("map of slice of pointers", func(t *testing.T) {
+		got := struct {
+			Deep map[string][]*leaf
+		}{Deep: map[string][]*leaf{
+			"key": {{Kept: 123}},
+		}}
 
-// TestSet_DeepContainersFromTag covers nesting created entirely by a tag, rather than by the caller.
-func TestSet_DeepContainersFromTag(t *testing.T) {
-	type sample struct {
-		Deep map[string][]nestLeaf `default:"{\"key\": [{\"Kept\": 123}]}"`
-	}
+		require.NoError(t, defaults.Set(&got))
 
-	var got sample
-	require.NoError(t, defaults.Set(&got))
+		require.Len(t, got.Deep["key"], 1)
+		require.NotNil(t, got.Deep["key"][0])
+		assert.Equal(t, filled, *got.Deep["key"][0])
+	})
 
-	assert.Equal(t, map[string][]nestLeaf{
-		"key": {{NestEmbedded: NestEmbedded{Depth: 1}, Name: "leaf", Kept: 123}},
-	}, got.Deep)
+	t.Run("created by a tag", func(t *testing.T) {
+		got := struct {
+			Deep map[string][]leaf `default:"{\"key\": [{\"Kept\": 123}]}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, map[string][]leaf{"key": {filled}}, got.Deep)
+	})
 }

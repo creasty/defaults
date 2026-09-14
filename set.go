@@ -37,9 +37,11 @@ type pendingDefault struct {
 	outer *pendingDefault
 }
 
-// Set initializes members in a struct referenced by a pointer.
-// Maps and slices are initialized by `make` and other primitive types are set with default values.
-// `ptr` should be a non-nil struct pointer, or Set returns ErrInvalidType.
+// Set fills the fields of the struct ptr points to from their `default` tags, and descends into
+// structs, pointers, slices and maps to do the same below. A field is written only while it holds
+// its zero value, and a nil map, slice or pointer is allocated only by a tag.
+//
+// ptr should be a non-nil struct pointer, or Set returns ErrInvalidType.
 func Set(ptr interface{}) error {
 	return set(ptr, nil)
 }
@@ -361,9 +363,9 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) 
 }
 
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
-// any tag: a struct is always descended into, as is a pointer the caller already allocated, and a
-// container the caller already filled has elements to recurse into. Whether a tag is present is the
-// caller's business.
+// any tag: a struct is always descended into, as is a pointer the caller already allocated to a
+// struct, and a container the caller already filled has elements to recurse into. Whether a tag is
+// present is the caller's business.
 func shouldInitializeField(field reflect.Value) bool {
 	switch field.Kind() {
 	case reflect.Struct:

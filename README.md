@@ -56,9 +56,10 @@ $ go get github.com/creasty/defaults
 - Preserves non-initial values from being reset with a default value
 
 The API is three functions: `Set`, `MustSet` (the same, but panicking), and `CanUpdate`. Runnable
-examples for each are on [pkg.go.dev](https://pkg.go.dev/github.com/creasty/defaults#pkg-examples),
-and [the package example](https://pkg.go.dev/github.com/creasty/defaults#example-package) walks the
-composite cases in one program.
+examples for `Set`, `CanUpdate` and `Setter` are on
+[pkg.go.dev](https://pkg.go.dev/github.com/creasty/defaults#pkg-examples), and
+[the package example](https://pkg.go.dev/github.com/creasty/defaults#example-package), which calls
+`MustSet`, walks the composite cases in one program.
 
 
 ## Behavior
@@ -70,8 +71,10 @@ unspecified value from its zero value — an `int` left alone is `0`, a `string`
 `false` — so a zero the caller set on purpose is indistinguishable from one never set, and the
 default replaces it.
 
-Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to the zero
-value is preserved: `*bool` is the way to let `false` survive a `default:"true"`.
+Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to a zero
+scalar is preserved: `*bool` is the way to let `false` survive a `default:"true"`. A pointer to a
+struct is descended into like the struct itself, though, so the struct's zero fields still get
+their defaults.
 
 ```go
 type Feature struct {
@@ -82,6 +85,13 @@ type Feature struct {
 
 `default:"-"` opts a field out entirely: it is neither parsed nor recursed into. That is how a field
 gets its value from a `SetDefaults` method instead of a tag.
+
+### Integers
+
+An integer tag is a Go integer literal: `0x`, `0o` and `0b` prefixes and `_` separators all work,
+and so does the legacy octal of a leading `0`, so `default:"0644"` is 420 and `default:"08080"` is
+an error. Slice and map tags are JSON instead, where a number rejects a leading zero, and an integer
+map key, a string in JSON, is read as decimal: `{"010": ...}` is key 10.
 
 ### Durations
 
@@ -98,6 +108,17 @@ type Job struct {
 
 This is deliberate: a type defined from `time.Duration` keeps no trace of it at runtime, so parsing
 durations only for `time.Duration` itself would stop such types from taking `"10s"`.
+
+### Unmarshalers
+
+The precedence of `UnmarshalText` and `UnmarshalJSON` over `SetDefaults` covers a tag handed to
+them and taken. A tag they reject is parsed by the field's kind instead, so a struct parsed that way
+gets its own field tags and `SetDefaults` as usual. `{}` and `[]` are never handed to `UnmarshalJSON`
+directly: `{}` allocates an empty struct or map and `[]` an empty slice, while `[]` on a struct or map
+and `{}` on a slice are parsed through `encoding/json`, which may call `UnmarshalJSON` on the way
+without that counting as taking the tag. A value built from a parent's JSON tag, such as an element
+of a slice, is filled like any other too, whatever unmarshaler `encoding/json` ran while decoding
+it.
 
 
 ## Design principles

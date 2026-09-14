@@ -40,7 +40,11 @@ func TestSet_UnexportedCompositeFieldsAreSkippedWholesale(t *testing.T) {
 	type inner struct {
 		Name string `default:"inner"`
 	}
+	type promoted struct {
+		Promoted string `default:"promoted"`
+	}
 	type sample struct {
+		promoted
 		hidden    inner
 		hiddenPtr *inner `default:"{}"`
 		hiddenMap map[string]inner
@@ -53,6 +57,8 @@ func TestSet_UnexportedCompositeFieldsAreSkippedWholesale(t *testing.T) {
 	}
 	require.NoError(t, defaults.Set(&got))
 
+	assert.Empty(t, got.Promoted,
+		"QUIRK: reflect could set a field promoted from an unexported embedded struct, and encoding/json fills one, but the guard stops at the embedded field")
 	assert.Empty(t, got.hidden.Name, "a nested tag below an unexported field never applies")
 	assert.Nil(t, got.hiddenPtr, "not even an explicit tag allocates it")
 	assert.Empty(t, got.hiddenMap["a"].Name)
@@ -60,9 +66,10 @@ func TestSet_UnexportedCompositeFieldsAreSkippedWholesale(t *testing.T) {
 }
 
 // TestSet_UnexportedEmbeddedStructIsSkippedWholesale pins that the setter goes unapplied along with
-// the tags when the unexported field is embedded. Go promotes the embedded type's SetDefaults to the
-// struct that embeds it, and Set used to call it through the struct: the one part of an unexported
-// field that Set reached at all.
+// the tags when the unexported field is embedded; the tags are
+// TestSet_UnexportedCompositeFieldsAreSkippedWholesale's. Go promotes the embedded type's
+// SetDefaults to the struct that embeds it, and Set used to call it through the struct: the one part
+// of an unexported field that Set reached at all.
 func TestSet_UnexportedEmbeddedStructIsSkippedWholesale(t *testing.T) {
 	var got struct {
 		unexportedCounter
