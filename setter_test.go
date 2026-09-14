@@ -381,8 +381,10 @@ func TestSetter_InvocationCount(t *testing.T) {
 }
 
 // TestSetter_CalledOnPointerToNonStruct pins the setter calls a non-struct type gets: one behind a
-// pointer, and none otherwise. Embedding the field changes neither; it used to add one, because Go
-// promotes the embedded type's SetDefaults to the struct and Set called it through the struct too.
+// pointer the tag allocated, unless its unmarshaler took the tag, which
+// TestSet_TextUnmarshalerWinsOverSetter pins, and none otherwise. Embedding the field changes
+// neither; it used to add one, because Go promotes the embedded type's SetDefaults to the struct and
+// Set called it through the struct too.
 func TestSetter_CalledOnPointerToNonStruct(t *testing.T) {
 	t.Run("behind a pointer", func(t *testing.T) {
 		got := struct {

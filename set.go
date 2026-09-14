@@ -70,7 +70,7 @@ func set(ptr interface{}, pending *pendingDefault) error {
 			continue
 		}
 
-		if err := setField(v.Field(i), fieldTag{
+		if _, err := setField(v.Field(i), fieldTag{
 			fieldName: t.Field(i).Name,
 			value:     defaultVal,
 			present:   ok,
@@ -87,16 +87,19 @@ func set(ptr interface{}, pending *pendingDefault) error {
 	return nil
 }
 
-func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error {
+// setField fills field from its tag and descends into it. It reports whether an UnmarshalText or
+// UnmarshalJSON took the tag, the field's own or, behind a pointer, its pointee's, which decides
+// whether the pointer above calls a setter.
+func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool, error) {
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
 
 	if !field.CanSet() {
-		return nil
+		return false, nil
 	}
 
 	if !tag.present && !shouldInitializeField(field) {
-		return nil
+		return false, nil
 	}
 
 	isInitial := isInitialValue(field)
@@ -110,7 +113,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 		if tag.present {
 			for p := pending; p != nil; p = p.outer {
 				if p.typ == field.Type() && p.value == defaultVal {
-					return fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, defaultVal)
+					return false, fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, defaultVal)
 				}
 			}
 			pending = &pendingDefault{typ: field.Type(), value: defaultVal, outer: pending}
@@ -118,7 +121,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 
 		unmarshaled, unmarshalErr := unmarshalByInterface(field, defaultVal)
 		if unmarshaled {
-			return nil
+			return true, nil
 		}
 
 		// parseErr turns a failed parse into the error Set returns, with one exception: an empty tag
@@ -143,31 +146,31 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 		case reflect.Bool:
 			val, err := strconv.ParseBool(defaultVal)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Int:
 			val, err := strconv.ParseInt(defaultVal, 0, strconv.IntSize)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int(val)).Convert(field.Type()))
 		case reflect.Int8:
 			val, err := strconv.ParseInt(defaultVal, 0, 8)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int8(val)).Convert(field.Type()))
 		case reflect.Int16:
 			val, err := strconv.ParseInt(defaultVal, 0, 16)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int16(val)).Convert(field.Type()))
 		case reflect.Int32:
 			val, err := strconv.ParseInt(defaultVal, 0, 32)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int32(val)).Convert(field.Type()))
 		case reflect.Int64:
@@ -185,54 +188,54 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			} else if val, intErr := strconv.ParseInt(defaultVal, 0, 64); intErr == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else {
-				return parseErr(fmt.Errorf("%w; %w", err, intErr))
+				return false, parseErr(fmt.Errorf("%w; %w", err, intErr))
 			}
 		case reflect.Uint:
 			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint(val)).Convert(field.Type()))
 		case reflect.Uint8:
 			val, err := strconv.ParseUint(defaultVal, 0, 8)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint8(val)).Convert(field.Type()))
 		case reflect.Uint16:
 			val, err := strconv.ParseUint(defaultVal, 0, 16)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint16(val)).Convert(field.Type()))
 		case reflect.Uint32:
 			val, err := strconv.ParseUint(defaultVal, 0, 32)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint32(val)).Convert(field.Type()))
 		case reflect.Uint64:
 			val, err := strconv.ParseUint(defaultVal, 0, 64)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Uintptr:
 			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uintptr(val)).Convert(field.Type()))
 		case reflect.Float32:
 			val, err := strconv.ParseFloat(defaultVal, 32)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(float32(val)).Convert(field.Type()))
 		case reflect.Float64:
 			val, err := strconv.ParseFloat(defaultVal, 64)
 			if err != nil {
-				return parseErr(err)
+				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.String:
@@ -243,7 +246,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
 			if defaultVal != "" && defaultVal != "[]" {
 				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
-					return parseErr(err)
+					return false, parseErr(err)
 				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
@@ -252,14 +255,14 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			ref.Elem().Set(reflect.MakeMap(field.Type()))
 			if defaultVal != "" && defaultVal != "{}" {
 				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
-					return parseErr(err)
+					return false, parseErr(err)
 				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
 			if defaultVal != "" && defaultVal != "{}" {
 				if err := json.Unmarshal([]byte(defaultVal), field.Addr().Interface()); err != nil {
-					return parseErr(err)
+					return false, parseErr(err)
 				}
 			}
 		case reflect.Pointer:
@@ -270,7 +273,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			// reported rather than dropped, which would leave a zero value that looks legitimate:
 			// the nil UUID, for uuid.UUID. See https://github.com/creasty/defaults/issues/89.
 			if unmarshalErr != nil {
-				return parseErr(unmarshalErr)
+				return false, parseErr(unmarshalErr)
 			}
 		}
 	}
@@ -278,25 +281,29 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 	switch field.Kind() {
 	case reflect.Pointer:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			if err := setField(field.Elem(), tag, pending); err != nil {
-				return err
+			taken, err := setField(field.Elem(), tag, pending)
+			if err != nil {
+				return false, err
 			}
 
 			// A struct pointee's setter is not called here: Set has called it as the recursion
 			// finished, or skipped it because it is promoted or because an unmarshaler took the tag.
-			// Anything else behind a pointer gets no setter call but this one.
-			if field.Elem().Kind() != reflect.Struct {
+			// Anything else behind a pointer the tag allocated gets no setter call but this one, and
+			// none when UnmarshalText or UnmarshalJSON was handed the tag and took it, as a struct
+			// gets none then.
+			if field.Elem().Kind() != reflect.Struct && !taken {
 				callSetter(field.Interface())
 			}
+			return taken, nil
 		}
 	case reflect.Struct:
 		if err := set(field.Addr().Interface(), pending); err != nil {
-			return err
+			return false, err
 		}
 	case reflect.Slice:
 		for j := 0; j < field.Len(); j++ {
-			if err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
-				return err
+			if _, err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+				return false, err
 			}
 		}
 	case reflect.Map:
@@ -321,8 +328,8 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 					v = copyValue.Elem()
 				}
 
-				if err := setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
-					return err
+				if _, err := setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+					return false, err
 				}
 
 				if !originalIsPtr {
@@ -332,7 +339,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 		}
 	}
 
-	return nil
+	return false, nil
 }
 
 // unmarshalByInterface offers the tag to the field's own unmarshalers ahead of parsing by kind,

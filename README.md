@@ -50,9 +50,11 @@ $ go get github.com/creasty/defaults
 - Recursively initializes fields in a struct
 - Dynamically sets default values by:
   - Implementing the [`defaults.Setter`](./setter.go) interface, or
-  - Implementing [`encoding.TextUnmarshaler`](https://pkg.go.dev/encoding#TextUnmarshaler), which
-    takes precedence over `defaults.Setter` -- the tag is handed to `UnmarshalText` and
-    `SetDefaults` is not called
+  - Implementing [`encoding.TextUnmarshaler`](https://pkg.go.dev/encoding#TextUnmarshaler) or
+    [`json.Unmarshaler`](https://pkg.go.dev/encoding/json#Unmarshaler), which takes precedence
+    over `defaults.Setter` -- a field's own tag is handed to `UnmarshalText` (or `UnmarshalJSON`),
+    and when that takes it, `SetDefaults` is not called for the field (see
+    [Unmarshalers](#unmarshalers))
 - Preserves non-initial values from being reset with a default value
 
 The API is three functions: `Set`, `MustSet` (the same, but panicking), and `CanUpdate`. Runnable
