@@ -63,6 +63,20 @@ func (u *UmTextAndSetter) SetDefaults() {
 	u.Via += "+setter"
 }
 
+// umLevelTextAndSetter is a non-struct type with a text form and a setter. Behind a pointer its
+// setter is called from the pointer branch of setField, where a struct's is called from Set.
+type umLevelTextAndSetter int
+
+func (l *umLevelTextAndSetter) UnmarshalText(text []byte) error {
+	n, err := strconv.Atoi(string(text))
+	*l = umLevelTextAndSetter(n)
+	return err
+}
+
+func (l *umLevelTextAndSetter) SetDefaults() {
+	*l += 100
+}
+
 // umJSONListRecorder is slice-kinded and implements only json.Unmarshaler, recording the raw bytes
 // it was handed as its one element.
 type umJSONListRecorder []string
@@ -248,8 +262,10 @@ func TestSet_TextUnmarshalerWinsOverJSON(t *testing.T) {
 //
 // A pointer field used to be the exception. The pointer branch of setField called the setter
 // itself once the recursion returned, so it ran after UnmarshalText regardless; that call was the
-// duplicate in https://github.com/creasty/defaults/issues/67, and removing it brought the pointer
-// into line.
+// duplicate in https://github.com/creasty/defaults/issues/67, and removing it brought a pointer to a
+// struct into line. A pointer to anything else still calls the setter itself, since there is no
+// recursion into a struct to call it, and it used to do so after UnmarshalText too; it now skips the
+// call when an unmarshaler took the tag.
 //
 // An embedded field was another. Go promotes the embedded type's SetDefaults to the struct that
 // embeds it, and Set called it through the struct after UnmarshalText had taken the tag.
@@ -283,6 +299,28 @@ func TestSet_TextUnmarshalerWinsOverSetter(t *testing.T) {
 
 		require.NotNil(t, got.Value)
 		assert.Equal(t, "text:x", got.Value.Via, "UnmarshalText ran and SetDefaults did not")
+	})
+
+	t.Run("behind a pointer to a non-struct type", func(t *testing.T) {
+		got := struct {
+			Level *umLevelTextAndSetter `default:"3"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Level)
+		assert.Equal(t, umLevelTextAndSetter(3), *got.Level, "UnmarshalText ran and SetDefaults did not add 100")
+	})
+
+	t.Run("behind a pointer to a non-struct type, with an empty tag", func(t *testing.T) {
+		got := struct {
+			Level *umLevelTextAndSetter `default:""`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		require.NotNil(t, got.Level)
+		assert.Equal(t, umLevelTextAndSetter(100), *got.Level, "nothing to unmarshal, so the setter is reached")
 	})
 
 	t.Run("embedded", func(t *testing.T) {
