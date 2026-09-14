@@ -178,12 +178,14 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) error 
 			// https://github.com/creasty/defaults/issues/66.
 			//
 			// The duration attempt tolerates surrounding whitespace, the numeric fallback does not.
+			// When both fail, both errors are reported, since the tag may have been meant for either,
+			// unless the type's own unmarshaler rejected it first: parseErr reports that rejection.
 			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
-			} else if val, err := strconv.ParseInt(defaultVal, 0, 64); err == nil {
+			} else if val, intErr := strconv.ParseInt(defaultVal, 0, 64); intErr == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else {
-				return parseErr(err)
+				return parseErr(fmt.Errorf("%w; %w", err, intErr))
 			}
 		case reflect.Uint:
 			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
