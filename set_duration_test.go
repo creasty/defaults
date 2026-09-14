@@ -1,6 +1,7 @@
 package defaults_test
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -53,6 +54,23 @@ func TestSet_DurationAndIntegerShareOneParser(t *testing.T) {
 	assert.Equal(t, time.Nanosecond, got.BareNumberOnDuration, "a bare number is nanoseconds")
 	assert.Equal(t, int64(3600000000000), got.DurationOnInt64, "a duration string lands on a plain int64")
 	assert.Equal(t, int64(64), got.NumberOnInt64, "and a plain number still works")
+}
+
+// TestSet_DurationErrorNamesBothParsers covers an int64-kinded tag that neither parser takes. The
+// error carries both rejections, the duration parser's first, since the tag may have been meant for
+// either. Only the numeric parser's used to be reported, so "1d" on a Duration read as invalid
+// syntax for an integer.
+func TestSet_DurationErrorNamesBothParsers(t *testing.T) {
+	got := struct {
+		Timeout time.Duration `default:"1d"`
+	}{}
+
+	err := defaults.Set(&got)
+
+	assert.EqualError(t, err,
+		`field Timeout: invalid default "1d": time: unknown unit "d" in duration "1d"; strconv.ParseInt: parsing "1d": invalid syntax`)
+	var numErr *strconv.NumError
+	assert.ErrorAs(t, err, &numErr, "the numeric parser's error stays reachable")
 }
 
 // TestSet_DurationStringOnANarrowerIntegerIsRejected pins that the duration fallback is int64-only.
