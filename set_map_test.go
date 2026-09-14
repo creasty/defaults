@@ -1,6 +1,7 @@
 package defaults_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -209,6 +210,32 @@ func TestSet_MapOfPointerContainers(t *testing.T) {
 
 	require.NotNil(t, got.Maps["a"])
 	assert.Equal(t, "inner", (*got.Maps["a"])["x"].Name)
+}
+
+// TestSet_MapEntryUnderNaNKeyIsSkipped pins that an entry whose key is NaN gets no defaults. Each
+// value is looked up by its key, and NaN never equals itself, so the lookup finds nothing.
+//
+// QUIRK: Go's own m[k] cannot find such an entry either, and a value put back under NaN would be
+// added beside the entry rather than replace it.
+func TestSet_MapEntryUnderNaNKeyIsSkipped(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	got := struct {
+		Map map[float64]*inner
+	}{Map: map[float64]*inner{math.NaN(): {}, 1: {}}}
+
+	require.NoError(t, defaults.Set(&got))
+
+	require.Len(t, got.Map, 2)
+	for key, value := range got.Map {
+		if math.IsNaN(key) {
+			assert.Empty(t, value.Name, "the entry under NaN is not reached")
+		} else {
+			assert.Equal(t, "inner", value.Name)
+		}
+	}
 }
 
 // TestSet_MapTagIsNotReappliedToElements pins that the element recursion is handed an empty tag: the

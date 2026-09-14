@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,12 +149,61 @@ func TestSet_IntegerLiteralBases(t *testing.T) {
 	})
 }
 
+// TestSet_LeadingZeroIsOctal pins that an integer tag is a Go integer literal all the way, legacy
+// octal included: a leading zero makes the rest octal, so a zero-padded decimal changes value, or
+// fails when it holds an 8 or a 9. A slice or map tag is JSON instead, where a number rejects a
+// leading zero, and an integer map key, a string in JSON, is read as decimal.
+//
+// QUIRK: https://github.com/creasty/defaults/pull/19 chose strconv's base 0, with octal file modes
+// such as 0644 among its examples, so a zero-padded decimal is read as octal.
+func TestSet_LeadingZeroIsOctal(t *testing.T) {
+	t.Run("a padded decimal changes value", func(t *testing.T) {
+		got := struct {
+			Mode  uint32        `default:"0644"`
+			Count int           `default:"010"`
+			Delay time.Duration `default:"010"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, uint32(420), got.Mode)
+		assert.Equal(t, 8, got.Count)
+		assert.Equal(t, 8*time.Nanosecond, got.Delay, "through the numeric fallback")
+	})
+
+	t.Run("an 8 or a 9 fails", func(t *testing.T) {
+		got := struct {
+			Port int `default:"08080"`
+		}{}
+
+		assert.Error(t, defaults.Set(&got))
+	})
+
+	t.Run("a slice tag rejects the leading zero", func(t *testing.T) {
+		got := struct {
+			Ports []int `default:"[010]"`
+		}{}
+
+		assert.Error(t, defaults.Set(&got))
+	})
+
+	t.Run("a map tag reads an integer key as decimal", func(t *testing.T) {
+		got := struct {
+			Ports map[int]string `default:"{\"010\": \"a\"}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, map[int]string{10: "a"}, got.Ports)
+	})
+}
+
 // TestSet_NumericWidthBoundaries pins the bit size each numeric case parses with. Every case passes
 // that width to strconv as a literal, and a wrong one is invisible except at the boundary: the
 // largest value that must parse, and a value past it that must not.
 //
-// Values past the boundary are covered by TestSet_UnparsableValuesAreRejected, which asserts the
-// error they now produce; a wider parse would succeed there and report no error.
+// Values past the boundary of each fixed width are covered by TestSet_UnparsableValuesAreRejected,
+// which asserts the error they now produce; a wider parse would succeed there and report no error.
 func TestSet_NumericWidthBoundaries(t *testing.T) {
 	t.Run("largest value parses", func(t *testing.T) {
 		type sample struct {
@@ -279,9 +329,11 @@ func TestSet_NamedScalarTypes(t *testing.T) {
 // an error naming the field, where it used to leave the field at zero and report success. See
 // https://github.com/creasty/defaults/issues/54.
 //
-// Every kind is listed because each has its own strconv call and its own error branch. The integer
-// values are one past the width's boundary, so this doubles as the check that each width parses at
-// the size it claims: a wider parse would succeed and no error would come back.
+// Every kind is listed because each has its own strconv call and its own error branch. The
+// fixed-width integer values are one past the width's boundary, so this doubles as the check that
+// each width parses at the size it claims: a wider parse would succeed and no error would come back.
+// int, uint and uintptr parse at strconv.IntSize, and no single value is exactly one past that on
+// every platform, so theirs are a syntax and a sign rejection instead.
 func TestSet_UnparsableValuesAreRejected(t *testing.T) {
 	tests := []struct {
 		name string
@@ -309,13 +361,13 @@ func TestSet_UnparsableValuesAreRejected(t *testing.T) {
 			V uint `default:"-1"`
 		}{}},
 		{"uint8", &struct {
-			V uint8 `default:"257"`
+			V uint8 `default:"256"`
 		}{}},
 		{"uint16", &struct {
-			V uint16 `default:"65537"`
+			V uint16 `default:"65536"`
 		}{}},
 		{"uint32", &struct {
-			V uint32 `default:"4294967297"`
+			V uint32 `default:"4294967296"`
 		}{}},
 		{"uint64", &struct {
 			V uint64 `default:"18446744073709551616"`

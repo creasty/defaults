@@ -63,6 +63,24 @@ func (u *UmTextAndSetter) SetDefaults() {
 	u.Via += "+setter"
 }
 
+// umJSONListRecorder is slice-kinded and implements only json.Unmarshaler, recording the raw bytes
+// it was handed as its one element.
+type umJSONListRecorder []string
+
+func (l *umJSONListRecorder) UnmarshalJSON(b []byte) error {
+	*l = umJSONListRecorder{string(b)}
+	return nil
+}
+
+// umJSONMapRecorder is map-kinded and implements only json.Unmarshaler, recording the raw bytes it
+// was handed under "raw".
+type umJSONMapRecorder map[string]string
+
+func (m *umJSONMapRecorder) UnmarshalJSON(b []byte) error {
+	*m = umJSONMapRecorder{"raw": string(b)}
+	return nil
+}
+
 // umBoth implements both interfaces and records which one was used.
 type umBoth struct {
 	Via string
@@ -407,14 +425,52 @@ func TestSet_FailingUnmarshalerWithNothingToFallBackTo(t *testing.T) {
 }
 
 // TestSet_EmptyContainerTagsAndJSONUnmarshaler pins which empty-container tags reach a custom
-// UnmarshalJSON. The interface path withholds both `{}` and `[]`, on the grounds that they mean
-// "allocate an empty one" — but for a struct-kinded type the kind-based path then hands `[]` to
-// encoding/json anyway, which calls the very same method. So the two are not symmetric.
+// UnmarshalJSON. The interface path withholds both `{}` and `[]` whatever the field's kind, on the
+// grounds that they mean "allocate an empty one" — but the kind-based path allocates an empty value
+// only for its own literal, `{}` for a struct or map and `[]` for a slice, and hands the other one to
+// encoding/json, which calls the very same method. So the two are not symmetric. A scalar kind gets
+// neither: it parses the literal itself, which a number or a bool rejects and a string takes as it
+// is.
 //
-// This needs a type that implements *only* json.Unmarshaler. With one that also implements
+// This needs types that implement *only* json.Unmarshaler. With one that also implements
 // UnmarshalText, text wins first and the JSON guard is never evaluated, which makes the test unable
 // to fail.
 func TestSet_EmptyContainerTagsAndJSONUnmarshaler(t *testing.T) {
+	t.Run("a slice or map type's own literal is withheld", func(t *testing.T) {
+		got := struct {
+			List umJSONListRecorder `default:"[]"`
+			Map  umJSONMapRecorder  `default:"{}"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, umJSONListRecorder{}, got.List, "allocated empty, and UnmarshalJSON is not called")
+		assert.Equal(t, umJSONMapRecorder{}, got.Map, "allocated empty, and UnmarshalJSON is not called")
+	})
+
+	t.Run("a slice or map type's other literal arrives through encoding/json", func(t *testing.T) {
+		got := struct {
+			List umJSONListRecorder `default:"{}"`
+			Map  umJSONMapRecorder  `default:"[]"`
+		}{}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, umJSONListRecorder{"{}"}, got.List,
+			"QUIRK: the interface path withholds {} but the slice path passes it to encoding/json, which calls UnmarshalJSON")
+		assert.Equal(t, umJSONMapRecorder{"raw": "[]"}, got.Map,
+			"QUIRK: the interface path withholds [] but the map path passes it to encoding/json, which calls UnmarshalJSON")
+	})
+
+	t.Run("a scalar type parses the literal itself", func(t *testing.T) {
+		got := struct {
+			Value umJSONEnum `default:"[]"`
+		}{}
+
+		assert.EqualError(t, defaults.Set(&got), `field Value: invalid default "[]": strconv.ParseInt: parsing "[]": invalid syntax`,
+			"QUIRK: UnmarshalJSON is never offered the tag, so the error is the int parse's rather than its rejection")
+	})
+
 	t.Run("an object tag is withheld", func(t *testing.T) {
 		type sample struct {
 			Value umJSONRecorder `default:"{}"`
