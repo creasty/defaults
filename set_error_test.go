@@ -2,7 +2,10 @@ package defaults_test
 
 import (
 	"encoding/json"
+	"math/big"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,11 +145,13 @@ func TestSet_PointerFieldErrorIsReported(t *testing.T) {
 	})
 
 	t.Run("pointer provided by the caller", func(t *testing.T) {
+		ptr := &badSlice{}
 		got := struct {
 			Ptr *badSlice
-		}{Ptr: &badSlice{}}
+		}{Ptr: ptr}
 
 		require.Error(t, defaults.Set(&got))
+		assert.Same(t, ptr, got.Ptr, "only a pointer the tag allocated is put back")
 	})
 }
 
@@ -160,6 +165,102 @@ func TestSet_ErrorStopsAtTheFirstField(t *testing.T) {
 
 	require.Error(t, defaults.Set(&got))
 	assert.Empty(t, got.After)
+}
+
+// TestSet_FailingDefaultLeavesZeroValuesZero pins that a value Set found zero is zero again when a
+// default below it fails, so a second Set meets the same tag and fails again. Set used to leave what
+// it had filled before the failure: a pointer or container the tag allocated, a struct encoding/json
+// decoded partway, the fields of a struct filled before one of them failed, or what an unmarshaler
+// wrote before rejecting the tag. The value was no longer zero, so a second Set could skip its tag
+// and return nil, or, below a tag that recurses, grow the value by another level.
+func TestSet_FailingDefaultLeavesZeroValuesZero(t *testing.T) {
+	type point struct {
+		X int
+		Y int
+	}
+	type bad struct {
+		Ints []int `default:"[!]"`
+	}
+	type partly struct {
+		Before int `default:"1"`
+		After  bad
+	}
+
+	tests := []struct {
+		name string
+		ptr  interface{}
+	}{
+		{"a pointer to a scalar", &struct {
+			V *time.Duration `default:"10 s"`
+		}{}},
+		{"a pointer to a slice", &struct {
+			V *[]int `default:"[!]"`
+		}{}},
+		{"a pointer to a struct", &struct {
+			V *point `default:"{!}"`
+		}{}},
+		{"a struct decoded partway", &struct {
+			V point `default:"{\"X\": 1, \"Y\": \"two\"}"`
+		}{}},
+		{"a struct filled partway", &struct {
+			V partly
+		}{}},
+		{"a slice the tag allocated", &struct {
+			V []bad `default:"[{}]"`
+		}{}},
+		{"a map the tag allocated", &struct {
+			V map[string]bad `default:"{\"a\": {}}"`
+		}{}},
+		{"an unmarshaler that wrote part of a value", &struct {
+			V big.Int `default:"12x"`
+		}{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Error(t, defaults.Set(tt.ptr))
+			assert.Zero(t, reflect.ValueOf(tt.ptr).Elem().Interface(), "what Set found zero is zero again")
+			require.Error(t, defaults.Set(tt.ptr), "so a second Set fails again")
+		})
+	}
+}
+
+// TestSet_FailingDefaultKeepsWhatWasNotZero pins the other side: a value Set did not find zero is not
+// put back, so the caller's slice or map survives a default that fails below it, and so does a field
+// Set filled before reaching the one that failed. TestSet_PointerFieldErrorIsReported pins it for a
+// pointer.
+func TestSet_FailingDefaultKeepsWhatWasNotZero(t *testing.T) {
+	type bad struct {
+		Ints []int `default:"[!]"`
+	}
+
+	t.Run("the caller's slice", func(t *testing.T) {
+		got := struct {
+			Items []bad
+		}{Items: []bad{{}}}
+
+		require.Error(t, defaults.Set(&got))
+		assert.Len(t, got.Items, 1)
+	})
+
+	t.Run("the caller's map", func(t *testing.T) {
+		got := struct {
+			Items map[string]bad
+		}{Items: map[string]bad{"a": {}}}
+
+		require.Error(t, defaults.Set(&got))
+		assert.Len(t, got.Items, 1)
+	})
+
+	t.Run("a field filled before the one that failed", func(t *testing.T) {
+		got := struct {
+			Before int `default:"1"`
+			After  bad
+		}{}
+
+		require.Error(t, defaults.Set(&got))
+		assert.Equal(t, 1, got.Before)
+	})
 }
 
 // TestSet_WellFormedJSONOfTheWrongShape covers the other way decoding fails: valid JSON that cannot

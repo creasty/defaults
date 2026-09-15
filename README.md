@@ -122,6 +122,13 @@ without that counting as taking the tag. A value built from a parent's JSON tag,
 of a slice, is filled like any other too, whatever unmarshaler `encoding/json` ran while decoding
 it.
 
+### Errors
+
+`Set` stops at the first field whose default fails and returns an error naming it. A value `Set`
+found zero on the way to that default is put back to zero, whatever part of the default it had
+taken, so calling `Set` again fails again. Fields filled elsewhere before the failure keep their
+defaults.
+
 
 ## Design principles
 
