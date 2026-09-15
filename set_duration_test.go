@@ -73,6 +73,22 @@ func TestSet_DurationErrorNamesBothParsers(t *testing.T) {
 	assert.ErrorAs(t, err, &numErr, "the numeric parser's error stays reachable")
 }
 
+// TestSet_DurationEmptyTagReportsNothing covers `default:""` on an int64-kinded field. Both parsers
+// reject an empty tag, as they reject "1d", but it asks for the zero value rather than for anything
+// to be parsed, so Set reports neither rejection and leaves the field zero. The int64 branch checks
+// for an empty tag before joining the two errors, so the int in TestSet_EmptyTag does not cover it.
+func TestSet_DurationEmptyTagReportsNothing(t *testing.T) {
+	type sample struct {
+		Duration time.Duration `default:""`
+		Int64    int64         `default:""`
+	}
+
+	var got sample
+	require.NoError(t, defaults.Set(&got))
+
+	assert.Zero(t, got)
+}
+
 // TestSet_DurationStringOnANarrowerIntegerIsRejected pins that the duration fallback is int64-only.
 // A narrower width rejects a duration string outright, where it used to keep its zero value and
 // report success.

@@ -136,6 +136,14 @@ func (u *umFailingBoth) UnmarshalJSON([]byte) error {
 	return errors.New("json fails")
 }
 
+// umFailingDuration always fails, and is int64-kinded, so parsing by kind tries both int64 parsers,
+// whose errors are joined when both reject the tag too.
+type umFailingDuration time.Duration
+
+func (u *umFailingDuration) UnmarshalText([]byte) error {
+	return errors.New("always fails")
+}
+
 // umDuration wraps a duration to give it a text format, which makes it struct-kinded: parsing by
 // kind hands its tag to encoding/json.
 type umDuration struct {
@@ -388,7 +396,8 @@ func TestSet_FailingUnmarshalerFallsBackToKind(t *testing.T) {
 // TestSet_FailingUnmarshalerErrorIsReported covers a tag the type's own unmarshaler rejects and
 // parsing by kind cannot take either. The error Set returns names that rejection as its cause.
 // For a type that implements both interfaces, the tag goes to UnmarshalText first, so its
-// rejection is the one named.
+// rejection is the one named. An int64-kinded type is listed too: both of its parsers fail as well,
+// and the rejection is named rather than their joined errors.
 //
 // The cause used to be the failed parse by kind, because the rejection was discarded. For a
 // struct-kinded type, that was a syntax error from encoding/json, a parser the tag was never
@@ -403,6 +412,9 @@ func TestSet_FailingUnmarshalerErrorIsReported(t *testing.T) {
 	type both struct {
 		Level umFailingBoth `default:"x"`
 	}
+	type int64Kind struct {
+		Delay umFailingDuration `default:"1d"`
+	}
 
 	tests := []struct {
 		name string
@@ -412,6 +424,7 @@ func TestSet_FailingUnmarshalerErrorIsReported(t *testing.T) {
 		{"text", &textOnly{}, `field Timeout: invalid default "garbage": time: invalid duration "garbage"`},
 		{"JSON", &jsonOnly{}, `field Level: invalid default "x": always fails`},
 		{"both", &both{}, `field Level: invalid default "x": text fails`},
+		{"text, on an int64 kind", &int64Kind{}, `field Delay: invalid default "1d": always fails`},
 	}
 
 	for _, tt := range tests {

@@ -278,7 +278,9 @@ func TestSet_WellFormedJSONOfTheWrongShape(t *testing.T) {
 }
 
 // TestSet_WhitespaceTagIsNotEmpty pins that a stray space is a value rather than an absence: a
-// string takes it verbatim, and every container tries to decode it as JSON and fails.
+// string takes it verbatim, and every container tries to decode it as JSON and fails. An int64
+// fails both of its parsers: the duration attempt trims the space to nothing, but the tag is not
+// empty, so both rejections are reported.
 func TestSet_WhitespaceTagIsNotEmpty(t *testing.T) {
 	t.Run("a string takes it", func(t *testing.T) {
 		got := struct {
@@ -288,6 +290,15 @@ func TestSet_WhitespaceTagIsNotEmpty(t *testing.T) {
 		require.NoError(t, defaults.Set(&got))
 
 		assert.Equal(t, " ", got.S)
+	})
+
+	t.Run("an int64 fails to parse it", func(t *testing.T) {
+		got := struct {
+			V int64 `default:" "`
+		}{}
+
+		assert.EqualError(t, defaults.Set(&got),
+			`field V: invalid default " ": time: invalid duration ""; strconv.ParseInt: parsing " ": invalid syntax`)
 	})
 
 	tests := []struct {
