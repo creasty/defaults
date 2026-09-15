@@ -76,7 +76,10 @@ default replaces it.
 Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to a zero
 scalar is preserved: `*bool` is the way to let `false` survive a `default:"true"`. A pointer to a
 struct is descended into like the struct itself, though, so the struct's zero fields still get
-their defaults.
+their defaults. A pointer the caller allocated to anything else is not: neither its tag nor the walk
+goes past it, so the elements behind a caller's `*[]T` or `*map[K]T`, and the struct behind a `**T`,
+get no defaults, and a default that would fail there is not reported. The same `*[]T` or `*map[K]T`
+held as a map value is descended into, though a `**T` held as one is not.
 
 ```go
 type Feature struct {
@@ -136,8 +139,9 @@ still being walked, `Set` goes no further, and the walk already under way finish
 A struct held as a map value cannot be filled in place, so `Set` fills a copy and stores it back
 under its key: every such struct it walks, whether or not anything changed. That store is a write to
 the map, so do not call `Set` while another goroutine reads a map of structs it walks, even one with
-nothing left to fill. A slice, map or pointer held as a map value is filled through, and never
-stored back, so `Set` only reads the map holding it.
+nothing left to fill. No other map value is stored back, so `Set` only reads a map of anything else.
+A slice or map held as a map value is filled through, as is a pointer to a struct, slice or map; a
+pointer to anything else, such as a `**T`, is not descended into.
 
 ### Errors
 
