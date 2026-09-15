@@ -105,3 +105,101 @@ func TestSet_SharedValueIsFilledOncePerPath(t *testing.T) {
 		}
 	})
 }
+
+// TestSet_SharedValueIsFilledOncePerPathAtAnyDepth covers values shared far down a long path, where Set
+// looks a value up in an index of the path instead of scanning the path for it. A value leaves the
+// index as its walk returns, so a second path reaches it again, however deep either path reaches it.
+func TestSet_SharedValueIsFilledOncePerPathAtAnyDepth(t *testing.T) {
+	const links = 1000
+
+	// The first path enters the shared chain at the top, where Set scans, and goes on far below it. The
+	// second enters it 1000 links down, so every link of the chain is looked up there: any that the
+	// first path left in the index would be taken for a repeat.
+	t.Run("a chain reached again further down", func(t *testing.T) {
+		type node struct {
+			Next    *node
+			Counter sharedCounter
+		}
+
+		var shared *node
+		for i := 0; i < links; i++ {
+			shared = &node{Next: shared}
+		}
+		detour := shared
+		for i := 0; i < links; i++ {
+			detour = &node{Next: detour}
+		}
+		got := struct {
+			Direct *node
+			Detour *node
+		}{Direct: shared, Detour: detour}
+
+		require.NoError(t, defaults.Set(&got))
+
+		n := detour
+		for i := 0; i < links; i++ {
+			require.Equal(t, 1, n.Counter.Calls, "detour link %d", i)
+			n = n.Next
+		}
+		for i := 0; n != nil; i++ {
+			require.Equal(t, 2, n.Counter.Calls, "shared link %d", i)
+			n = n.Next
+		}
+	})
+
+	// The field shares the node's address, so only its type tells the two apart in the index.
+	t.Run("a pointer to a sibling field", func(t *testing.T) {
+		type node struct {
+			Value sharedCounter
+			Ptr   *sharedCounter
+			Next  *node
+		}
+
+		bottom := &node{}
+		bottom.Ptr = &bottom.Value
+		top := bottom
+		for i := 0; i < links; i++ {
+			top = &node{Next: top}
+		}
+
+		require.NoError(t, defaults.Set(top))
+
+		assert.Equal(t, 2, bottom.Value.Calls)
+	})
+
+	t.Run("two slices over one array", func(t *testing.T) {
+		type node struct {
+			Next   *node
+			First  []sharedCounter
+			Second []sharedCounter
+		}
+
+		shared := []sharedCounter{{}}
+		top := &node{First: shared, Second: shared}
+		for i := 0; i < links; i++ {
+			top = &node{Next: top}
+		}
+
+		require.NoError(t, defaults.Set(top))
+
+		assert.Equal(t, 2, shared[0].Calls)
+	})
+
+	t.Run("one map in two fields", func(t *testing.T) {
+		type node struct {
+			Next   *node
+			First  map[string]sharedCounter
+			Second map[string]sharedCounter
+		}
+
+		shared := map[string]sharedCounter{"a": {}}
+		top := &node{First: shared, Second: shared}
+		for i := 0; i < links; i++ {
+			top = &node{Next: top}
+		}
+
+		require.NoError(t, defaults.Set(top))
+
+		assert.Equal(t, 2, shared["a"].Calls)
+	})
+}
