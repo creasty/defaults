@@ -1,6 +1,7 @@
 package defaults
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/json"
 	"errors"
@@ -51,6 +52,10 @@ type walk struct {
 	// entered holds a pointer to each value entered. It is made when the first value is entered,
 	// since Set on a struct of scalars enters none.
 	entered map[interface{}]struct{}
+
+	// writes counts the tags met on zero values and the setters called so far. A copy of a map value
+	// whose walk moved neither is known to be unchanged, with no need to compare it.
+	writes int
 }
 
 // mapTable names a map by a pointer to the table it refers to, and by its element type. A map value
@@ -216,6 +221,7 @@ func (w *walk) set(ptr interface{}, pending *pendingDefault) error {
 	// A SetDefaults promoted from an embedded field is that field's, and the loop above has dealt with
 	// it there, just as for a named field. Calling it through the struct as well would run it again.
 	if s, ok := ptr.(Setter); ok && !hasPromotedSetter(t) {
+		w.writes++
 		s.SetDefaults()
 	}
 	return nil
@@ -261,6 +267,7 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 		// depends on what it holds, and that is how a recursive type ends. See
 		// https://github.com/creasty/defaults/issues/71.
 		if tag.present {
+			w.writes++
 			for p := pending; p != nil; p = p.outer {
 				if p.typ == field.Type() && p.value == defaultVal {
 					return false, fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, defaultVal)
@@ -457,6 +464,7 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 			// none when UnmarshalText or UnmarshalJSON was handed the tag and took it, as a struct
 			// gets none then.
 			if isInitial && field.Elem().Kind() != reflect.Struct && !taken {
+				w.writes++
 				callSetter(field.Interface())
 			}
 			return taken, nil
@@ -482,7 +490,8 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 				v := field.MapIndex(e)
 
 				// A pointer value is written through, so it needs no copy and no write-back. Everything
-				// else does: a map value is not addressable, so it is worked on as a copy and put back.
+				// else is worked on as a copy, since a map value is not addressable; below is when the
+				// copy is put back.
 				originalIsPtr := v.Kind() == reflect.Pointer
 				if originalIsPtr {
 					if v.IsNil() {
@@ -493,6 +502,7 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 
 				switch v.Kind() {
 				case reflect.Struct, reflect.Slice, reflect.Map, reflect.Pointer:
+					original, writes := v, w.writes
 					if !v.CanAddr() {
 						copyValue := reflect.New(v.Type())
 						copyValue.Elem().Set(v)
@@ -503,7 +513,11 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 						return false, err
 					}
 
-					if !originalIsPtr {
+					// Only a struct copy that changed is put back, and only one a tag or a setter may
+					// have written to is compared. A slice or map copy refers to the same elements as
+					// the value in the map, which the recursion changed in place, so it never differs;
+					// and writing to a map Set had nothing to fill would race with anyone reading it.
+					if !originalIsPtr && v.Kind() == reflect.Struct && w.writes != writes && !sameBits(v, original) {
 						field.SetMapIndex(e, v)
 					}
 				}
@@ -541,6 +555,22 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) 
 		return false, textErr
 	}
 	return false, jsonErr
+}
+
+// sameBits reports whether v, an addressable copy of original, still holds exactly what original
+// does: every number to the last bit, down to the sign of a zero, and every pointer, slice and map
+// the same one rather than one equal to it. reflect.DeepEqual would take either kind of change for
+// none, and the change would be lost. Padding is copied along with the rest; a setter that assigns
+// its whole struct may change it, which costs no more than a write.
+func sameBits(v, original reflect.Value) bool {
+	o := reflect.New(original.Type()).Elem()
+	o.Set(original)
+
+	size := int(v.Type().Size())
+	return bytes.Equal(
+		unsafe.Slice((*byte)(v.Addr().UnsafePointer()), size),
+		unsafe.Slice((*byte)(o.Addr().UnsafePointer()), size),
+	)
 }
 
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of

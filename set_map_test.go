@@ -10,6 +10,38 @@ import (
 	"github.com/creasty/defaults"
 )
 
+// mapGuarded's setter writes only while its field is zero, as the Setter example does. Its type,
+// mapReplacer's and mapHook's are package-level only because they need a method.
+type mapGuarded struct {
+	Name string
+}
+
+func (g *mapGuarded) SetDefaults() {
+	if defaults.CanUpdate(g.Name) {
+		g.Name = "guarded"
+	}
+}
+
+// mapReplacer's setter replaces its pointer with a new one to an equal value: a change that only
+// the pointer's identity shows.
+type mapReplacer struct {
+	Ptr *int
+}
+
+func (r *mapReplacer) SetDefaults() {
+	n := *r.Ptr
+	r.Ptr = &n
+}
+
+// mapHook runs a function when Set calls its setter, so a test can act while a map value is filled.
+type mapHook struct {
+	run func()
+}
+
+func (h *mapHook) SetDefaults() {
+	h.run()
+}
+
 func TestSet_EmptyMapTagCreatesEmptyMap(t *testing.T) {
 	type sample struct {
 		Map map[string]int `default:"{}"`
@@ -210,6 +242,130 @@ func TestSet_MapOfPointerContainers(t *testing.T) {
 
 	require.NotNil(t, got.Maps["a"])
 	assert.Equal(t, "inner", (*got.Maps["a"])["x"].Name)
+}
+
+// TestSet_FilledMapIsNotWrittenTo pins that Set writes nothing into a map it has nothing to fill.
+// Every struct, slice and map value used to be put back after the recursion whether it changed or
+// not, so Set on a struct holding a map someone else was reading could crash the program with a
+// concurrent map read and map write.
+//
+// The assertion is the race detector's, which `make test` runs: a write to the map races with the
+// read in the goroutine, and nothing else does.
+func TestSet_FilledMapIsNotWrittenTo(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	t.Run("struct values", func(t *testing.T) {
+		got := struct {
+			Map map[string]inner
+		}{Map: map[string]inner{"a": {Name: "kept"}}}
+
+		read := make(chan struct{})
+		go func() {
+			defer close(read)
+			_ = got.Map["a"]
+		}()
+
+		require.NoError(t, defaults.Set(&got))
+		<-read
+	})
+
+	t.Run("struct values whose setter changes nothing", func(t *testing.T) {
+		got := struct {
+			Map map[string]mapGuarded
+		}{Map: map[string]mapGuarded{"a": {Name: "kept"}}}
+
+		read := make(chan struct{})
+		go func() {
+			defer close(read)
+			_ = got.Map["a"]
+		}()
+
+		require.NoError(t, defaults.Set(&got))
+		<-read
+	})
+
+	t.Run("slice values", func(t *testing.T) {
+		got := struct {
+			Map map[string][]inner
+		}{Map: map[string][]inner{"a": {{Name: "kept"}}}}
+
+		read := make(chan struct{})
+		go func() {
+			defer close(read)
+			_ = got.Map["a"]
+		}()
+
+		require.NoError(t, defaults.Set(&got))
+		<-read
+	})
+
+	t.Run("map values", func(t *testing.T) {
+		got := struct {
+			Map map[string]map[string]inner
+		}{Map: map[string]map[string]inner{"a": {"b": {Name: "kept"}}}}
+
+		read := make(chan struct{})
+		go func() {
+			defer close(read)
+			_ = got.Map["a"]
+		}()
+
+		require.NoError(t, defaults.Set(&got))
+		<-read
+	})
+}
+
+// TestSet_ChangedMapStructValueIsWrittenBack pins that a struct value in a map is put back whenever
+// its copy changed at all, even where reflect.DeepEqual would see no change: a zero whose sign
+// changed, and a pointer replaced by a new one to an equal value. Deciding with DeepEqual would
+// drop both. A copy that did not change is not put back, so it does not undo a store made under its
+// key while it was filled.
+func TestSet_ChangedMapStructValueIsWrittenBack(t *testing.T) {
+	t.Run("a negative zero", func(t *testing.T) {
+		type inner struct {
+			F float64 `default:"-0"`
+		}
+
+		got := struct {
+			Map map[string]inner
+		}{Map: map[string]inner{"a": {}}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.True(t, math.Signbit(got.Map["a"].F))
+	})
+
+	t.Run("a pointer replaced by an equal one", func(t *testing.T) {
+		n := 1
+		got := struct {
+			Map map[string]mapReplacer
+		}{Map: map[string]mapReplacer{"a": {Ptr: &n}}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.NotSame(t, &n, got.Map["a"].Ptr)
+		assert.Equal(t, 1, *got.Map["a"].Ptr)
+	})
+
+	t.Run("a store made while the copy was filled is kept", func(t *testing.T) {
+		type entry struct {
+			Hook mapHook
+			N    int
+		}
+
+		got := struct {
+			Map map[string]entry
+		}{Map: map[string]entry{}}
+		got.Map["a"] = entry{Hook: mapHook{run: func() {
+			got.Map["a"] = entry{N: 5}
+		}}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, 5, got.Map["a"].N, "the unchanged copy does not overwrite the store")
+	})
 }
 
 // TestSet_MapEntryUnderNaNKeyIsSkipped pins that an entry whose key is NaN gets no defaults. Each
