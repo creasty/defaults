@@ -321,12 +321,18 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 			return false, err
 		}
 	case reflect.Slice:
+		if !canHoldDefaults(field.Type().Elem()) {
+			break
+		}
 		for j := 0; j < field.Len(); j++ {
 			if _, err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
 				return false, err
 			}
 		}
 	case reflect.Map:
+		if !canHoldDefaults(field.Type().Elem()) {
+			break
+		}
 		for _, e := range field.MapKeys() {
 			v := field.MapIndex(e)
 
@@ -360,6 +366,22 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 	}
 
 	return false, nil
+}
+
+// canHoldDefaults reports whether a slice element or map value of type t is of a kind the walk
+// descends into. Such a value has no tag of its own, so descending into it is all the walk can do,
+// and it descends only into a struct, a pointer, a slice or a map: setField stops a slice element
+// of any other kind at shouldInitializeField, and the map loop's kind switch has no case for a map
+// value of one. An array or an interface may hold something with defaults, but neither is descended
+// into (TestSet_ArraysAreLeftAlone pins the array case), so a slice or map of any other kind would
+// be walked entry by entry to change nothing. Keep this list in step with shouldInitializeField and
+// the map loop's switch. The kind alone decides, so a pointer counts whatever it points to.
+func canHoldDefaults(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Struct, reflect.Pointer, reflect.Slice, reflect.Map:
+		return true
+	}
+	return false
 }
 
 // unmarshalByInterface offers the tag to the field's own unmarshalers ahead of parsing by kind,
