@@ -46,6 +46,8 @@ jobs:
           files: ./coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+      - name: Run every benchmark once
+        run: make bench-smoke
 
   # The check for the branch rule to require: the matrix's names change with its Go versions.
   test-ok:

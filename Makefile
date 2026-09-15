@@ -22,6 +22,16 @@ test:
 bench:
 	@go test -run '^$$' -bench . -benchmem .
 
+.PHONY: bench-smoke
+bench-smoke:
+	@go test -run '^$$' -bench . -benchtime 1x .
+
+# $(value ...) passes each variable as typed: $(BENCH) would expand the $ in a pattern such as
+# '^BenchmarkParse$'. The defaults live in the script.
+.PHONY: bench-compare
+bench-compare:
+	@BASE='$(value BASE)' ROUNDS='$(value ROUNDS)' BENCH='$(value BENCH)' BENCHTIME='$(value BENCHTIME)' bash scripts/bench-compare.sh
+
 .PHONY: cover
 cover:
 	@go test $(GO_TEST_FLAGS) -covermode=atomic -coverprofile=coverage.out .
