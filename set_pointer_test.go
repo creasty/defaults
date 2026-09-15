@@ -9,6 +9,14 @@ import (
 	"github.com/creasty/defaults"
 )
 
+// pointerAppender's setter appends to the slice it is called on, so a test can tell whether it ran.
+// It is package-level only because it needs a method.
+type pointerAppender []int
+
+func (a *pointerAppender) SetDefaults() {
+	*a = append(*a, 99)
+}
+
 func TestSet_PointersToScalars(t *testing.T) {
 	type myString string
 	type sample struct {
@@ -136,6 +144,123 @@ func TestSet_UntaggedPointerStructRecurses(t *testing.T) {
 
 	require.NotNil(t, got.Child)
 	assert.Equal(t, child{Name: "Jim", Age: 20}, *got.Child, "the caller's name survives, the missing age is filled")
+}
+
+// TestSet_UntaggedPointerToContainerRecurses covers a pointer the caller allocated to something other
+// than a struct or a scalar. What it holds is descended into, as a struct behind a pointer is, and as
+// a pointer to a slice or map has been as a map value since v1.6.0. These used to be skipped whole
+// everywhere else, and a pointer to a pointer even as a map value, so the elements of a caller's *[]T
+// got no defaults, and a default that failed there went unreported.
+//
+// The tag does not reach through such a pointer, though: what it points at is the caller's, as a
+// *bool holding false is, so a nil slice behind it stays nil. Nor does what it points at get a
+// SetDefaults call, which only a pointer the tag allocated makes.
+func TestSet_UntaggedPointerToContainerRecurses(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	t.Run("a slice", func(t *testing.T) {
+		slice := []inner{{}}
+		got := struct {
+			Ptr *[]inner
+		}{Ptr: &slice}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", slice[0].Name)
+	})
+
+	t.Run("a map", func(t *testing.T) {
+		mapping := map[string]inner{"a": {}}
+		got := struct {
+			Ptr *map[string]inner
+		}{Ptr: &mapping}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", mapping["a"].Name)
+	})
+
+	t.Run("a pointer", func(t *testing.T) {
+		ptr := &inner{}
+		got := struct {
+			Ptr **inner
+		}{Ptr: &ptr}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", ptr.Name)
+	})
+
+	t.Run("as a slice element", func(t *testing.T) {
+		slice := []inner{{}}
+		got := struct {
+			Slices []*[]inner
+		}{Slices: []*[]inner{&slice}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", slice[0].Name)
+	})
+
+	t.Run("as a map value", func(t *testing.T) {
+		ptr := &inner{}
+		got := struct {
+			Map map[string]**inner
+		}{Map: map[string]**inner{"a": &ptr}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", ptr.Name)
+	})
+
+	t.Run("a default that fails behind it is reported", func(t *testing.T) {
+		type bad struct {
+			Ints []int `default:"[!]"`
+		}
+
+		slice := []bad{{}}
+		got := struct {
+			Ptr *[]bad
+		}{Ptr: &slice}
+
+		require.Error(t, defaults.Set(&got))
+		assert.Same(t, &slice, got.Ptr, "the caller's pointer is kept")
+	})
+
+	t.Run("the tag stops at the caller's pointer", func(t *testing.T) {
+		var slice []int
+		got := struct {
+			Ptr *[]int `default:"[1, 2]"`
+		}{Ptr: &slice}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Nil(t, slice, "the nil slice the caller pointed at is kept")
+	})
+
+	t.Run("the tag stops at a caller's pointer to a pointer to a struct", func(t *testing.T) {
+		ptr := &inner{}
+		got := struct {
+			Ptr **inner `default:"{\"Name\": \"from the tag\"}"`
+		}{Ptr: &ptr}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, "inner", ptr.Name, "the struct gets its own field's default, not the tag's JSON")
+	})
+
+	t.Run("what a caller's pointer holds gets no setter call", func(t *testing.T) {
+		held := pointerAppender{1}
+		got := struct {
+			Ptr *pointerAppender
+		}{Ptr: &held}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, pointerAppender{1}, held, "only a pointer the tag allocated calls the setter of what it points at")
+	})
 }
 
 // TestSet_PointerWithEmptyTag covers `default:""` on a pointer. The tag is present, so the pointer

@@ -434,8 +434,19 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 
 	switch field.Kind() {
 	case reflect.Pointer:
-		if isInitial || field.Elem().Kind() == reflect.Struct {
-			taken, err := w.setField(field.Elem(), tag, pending)
+		// A pointer to a struct is not entered itself, since set enters the struct: a path that
+		// reached the pointer first, with no tag, would keep a later one from carrying its tag on.
+		// Nor is a pointer the tag has just allocated: a later path to it finds it filled already.
+		if (isInitial || shouldInitializeField(field)) && (field.Elem().Kind() == reflect.Struct || isInitial || w.enter(field)) {
+			// The tag carries on to what a pointer points at when the tag allocated it, or when it
+			// is a struct. Anything else behind a pointer the caller allocated is the caller's, as a
+			// *bool holding false is, so only what it already holds is descended into.
+			elemTag := tag
+			if !isInitial && field.Elem().Kind() != reflect.Struct {
+				elemTag = fieldTag{fieldName: tag.fieldName}
+			}
+
+			taken, err := w.setField(field.Elem(), elemTag, pending)
 			if err != nil {
 				return false, err
 			}
@@ -445,7 +456,7 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 			// Anything else behind a pointer the tag allocated gets no setter call but this one, and
 			// none when UnmarshalText or UnmarshalJSON was handed the tag and took it, as a struct
 			// gets none then.
-			if field.Elem().Kind() != reflect.Struct && !taken {
+			if isInitial && field.Elem().Kind() != reflect.Struct && !taken {
 				callSetter(field.Interface())
 			}
 			return taken, nil
@@ -481,7 +492,7 @@ func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pend
 				}
 
 				switch v.Kind() {
-				case reflect.Struct, reflect.Slice, reflect.Map:
+				case reflect.Struct, reflect.Slice, reflect.Map, reflect.Pointer:
 					if !v.CanAddr() {
 						copyValue := reflect.New(v.Type())
 						copyValue.Elem().Set(v)
@@ -533,15 +544,28 @@ func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) 
 }
 
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
-// any tag: a struct is always descended into, as is a pointer the caller already allocated to a
-// struct, and a container the caller already filled has elements to recurse into. Whether a tag is
-// present is the caller's business.
+// any tag: a struct is always descended into, and so is a pointer the caller already allocated to a
+// struct, to a non-nil pointer, or to a slice or map that holds something; and a container the
+// caller already filled has elements to recurse into. A pointer to anything else, a scalar, an array
+// or an interface, has nothing inside that Set fills. Whether a tag is present is the caller's
+// business.
 func shouldInitializeField(field reflect.Value) bool {
 	switch field.Kind() {
 	case reflect.Struct:
 		return true
 	case reflect.Pointer:
-		return !field.IsNil() && field.Elem().Kind() == reflect.Struct
+		if field.IsNil() {
+			return false
+		}
+		switch elem := field.Elem(); elem.Kind() {
+		case reflect.Struct:
+			return true
+		case reflect.Pointer:
+			return !elem.IsNil()
+		case reflect.Slice, reflect.Map:
+			return elem.Len() > 0
+		}
+		return false
 	case reflect.Slice, reflect.Map:
 		return field.Len() > 0
 	}

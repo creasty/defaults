@@ -61,6 +61,22 @@ func TestSet_CyclesEnd(t *testing.T) {
 		assert.Same(t, n, n.Next)
 	})
 
+	// Set did not use to reach this cycle at all, since it left a caller's pointer to a pointer
+	// alone. Now that it descends into one, the cycle has to end here too.
+	t.Run("a pointer to itself with no struct between", func(t *testing.T) {
+		type loop *loop
+
+		var l loop
+		l = &l
+		got := struct {
+			Loop loop
+		}{Loop: l}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, l, got.Loop)
+	})
+
 	t.Run("a slice holding itself with no struct between", func(t *testing.T) {
 		type loop []loop
 
@@ -214,6 +230,18 @@ func TestSet_ALaterPathStillAppliesItsTag(t *testing.T) {
 		require.NoError(t, defaults.Set(&got))
 
 		assert.Equal(t, []leaf{{Name: "leaf"}}, shared.Leaves)
+	})
+
+	t.Run("after an untagged pointer to the pointer", func(t *testing.T) {
+		got := struct {
+			Alias **inner
+			Ptr   *inner `default:"{\"Leaves\": [{}]}"`
+		}{Ptr: &inner{}}
+		got.Alias = &got.Ptr
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Equal(t, []leaf{{Name: "leaf"}}, got.Ptr.Leaves)
 	})
 
 	t.Run("into a struct inside the one decoded into", func(t *testing.T) {

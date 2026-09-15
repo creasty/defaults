@@ -76,7 +76,8 @@ default replaces it.
 Use a pointer where that distinction matters. `nil` means unspecified, and a pointer to a zero
 scalar is preserved: `*bool` is the way to let `false` survive a `default:"true"`. A pointer to a
 struct is descended into like the struct itself, though, so the struct's zero fields still get
-their defaults.
+their defaults, and so is a pointer to a slice, map or pointer, whose elements do. A tag does not
+reach past a pointer the caller allocated to anything but a struct.
 
 ```go
 type Feature struct {
