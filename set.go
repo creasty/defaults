@@ -8,7 +8,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unsafe"
 )
 
 // ErrInvalidType is the error Set returns, and MustSet panics with, when the argument is not a
@@ -37,9 +39,130 @@ type pendingDefault struct {
 	outer *pendingDefault
 }
 
+// walk is what one call to Set carries across every path through the value, where a
+// pendingDefault belongs to one path: the values entered so far.
+//
+// A value the caller made reachable more than once, through two pointers or a pointer back up to
+// where it sits, is entered once. Entering it again would call its SetDefaults again, once for every
+// path to it, which a chain of shared pointers makes exponential; and a cycle would be walked until
+// the stack overflowed. A later path still applies its own tag to a value left zero, though, and the
+// walk goes below again into whatever that tag creates, calling SetDefaults again on the way.
+type walk struct {
+	// entered holds a pointer to each value entered. It is made when the first value is entered,
+	// since Set on a struct of scalars enters none.
+	entered map[interface{}]struct{}
+}
+
+// mapTable names a map by a pointer to the table it refers to, and by its element type. A map value
+// is copied wherever it is stored, so what makes two of them the same map is the table, not where
+// either is stored. Two map types can share a table when they differ in name, which changes nothing
+// that gets filled, or in the tags of a struct element, which changes the defaults: so the element
+// type is part of the name, and the map type is not.
+type mapTable struct {
+	elem  reflect.Type
+	table unsafe.Pointer
+}
+
+// enter marks v as entered, and reports whether it was not already.
+//
+// A value is named by a pointer to it, which is its address and its type together, since a struct
+// and its first field share an address but not a type. A map is named by a pointer to its table
+// instead. Either pointer keeps what it points to alive until Set returns, so a value made later
+// cannot take the address of one entered and be mistaken for it.
+//
+// Values of zero size can share one address, so those of one type there are entered once between
+// them. Such a value holds nothing to fill, so only a SetDefaults with effects beyond its own value
+// could tell.
+func (w *walk) enter(v reflect.Value) bool {
+	var id interface{}
+	if v.Kind() == reflect.Map {
+		id = mapTable{elem: v.Type().Elem(), table: v.UnsafePointer()}
+	} else {
+		id = v.Addr().Interface()
+	}
+
+	if _, ok := w.entered[id]; ok {
+		return false
+	}
+	if w.entered == nil {
+		w.entered = make(map[interface{}]struct{})
+	}
+	w.entered[id] = struct{}{}
+	return true
+}
+
+// forget unmarks the struct v, and every exported struct stored in place inside it, so the walk goes
+// below them again.
+func (w *walk) forget(v reflect.Value) {
+	delete(w.entered, v.Addr().Interface())
+
+	for i := 0; i < v.NumField(); i++ {
+		if f := v.Field(i); f.Kind() == reflect.Struct && f.CanSet() {
+			w.forget(f)
+		}
+	}
+}
+
+// plainTypes caches plain's answer for each struct type it has been asked about.
+var plainTypes sync.Map
+
+var (
+	setterType          = reflect.TypeOf((*Setter)(nil)).Elem()
+	textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+	jsonUnmarshalerType = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+)
+
+// plain reports whether a struct of type t can be walked a second time with nothing to show for it,
+// so it need not be entered. Nothing inside it refers to another value, so the walk cannot come back
+// to it through its own fields; and nothing inside it, the struct included, has a SetDefaults,
+// UnmarshalText or UnmarshalJSON to run again, so a second walk only finds its tags applied already.
+// Not entering such structs spares the walk an entry for each element of a large slice of them.
+func plain(t reflect.Type) bool {
+	if p, ok := plainTypes.Load(t); ok {
+		return p.(bool)
+	}
+	p := holdsNothingToRepeat(t)
+	plainTypes.Store(t, p)
+	return p
+}
+
+// holdsNothingToRepeat is plain for a type of any kind, uncached.
+func holdsNothingToRepeat(t reflect.Type) bool {
+	if pt := reflect.PointerTo(t); pt.Implements(setterType) || pt.Implements(textUnmarshalerType) || pt.Implements(jsonUnmarshalerType) {
+		return false
+	}
+
+	switch t.Kind() {
+	case reflect.Struct:
+		for i := 0; i < t.NumField(); i++ {
+			if !holdsNothingToRepeat(t.Field(i).Type) {
+				return false
+			}
+		}
+	case reflect.Array:
+		return holdsNothingToRepeat(t.Elem())
+	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Interface, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+		return false
+	}
+	return true
+}
+
+// canHoldDefaults reports whether a value of type t can have anything below it filled when it is
+// reached with no tag of its own, as a slice element or a map value is: a struct, or a pointer, slice
+// or map that may lead to one. A slice or map of anything else is not walked at all.
+func canHoldDefaults(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Struct, reflect.Pointer, reflect.Slice, reflect.Map:
+		return true
+	}
+	return false
+}
+
 // Set fills the fields of the struct ptr points to from their `default` tags, and descends into
 // structs, pointers, slices and maps to do the same below. A field is written only while it holds
 // its zero value, and a nil map, slice or pointer is allocated only by a tag.
+// A value reachable more than once, through shared pointers or a cycle, is filled once, with the
+// exceptions Setter describes.
 //
 // Set stops at the first field whose default fails and returns its error. A value Set found zero on
 // the way to that default is left zero again, so a second Set fails again; fields filled elsewhere
@@ -47,12 +170,12 @@ type pendingDefault struct {
 //
 // ptr should be a non-nil struct pointer, or Set returns ErrInvalidType.
 func Set(ptr interface{}) error {
-	return set(ptr, nil)
+	return new(walk).set(ptr, nil)
 }
 
 // set is Set, for a struct that may be reached by recursion and so carries the tags still being
 // applied above it.
-func set(ptr interface{}, pending *pendingDefault) error {
+func (w *walk) set(ptr interface{}, pending *pendingDefault) error {
 	// The kind is read off the Value because reflect.TypeOf(nil) is itself nil, and a nil pointer
 	// has no struct behind it to fill: its Elem is an invalid Value, which has no Type. See
 	// https://github.com/creasty/defaults/issues/69.
@@ -68,13 +191,20 @@ func set(ptr interface{}, pending *pendingDefault) error {
 		return ErrInvalidType
 	}
 
+	// A struct entered already has been filled, or is being filled further up this path, and its
+	// setter has been called or will be. A plain struct is not entered, since walking it again does
+	// nothing.
+	if !plain(t) && !w.enter(v) {
+		return nil
+	}
+
 	for i := 0; i < t.NumField(); i++ {
 		defaultVal, ok := t.Field(i).Tag.Lookup(fieldName)
 		if ok && defaultVal == "-" {
 			continue
 		}
 
-		if _, err := setField(v.Field(i), fieldTag{
+		if _, err := w.setField(v.Field(i), fieldTag{
 			fieldName: t.Field(i).Name,
 			value:     defaultVal,
 			present:   ok,
@@ -94,7 +224,7 @@ func set(ptr interface{}, pending *pendingDefault) error {
 // setField fills field from its tag and descends into it. It reports whether an UnmarshalText or
 // UnmarshalJSON took the tag, the field's own or, behind a pointer, its pointee's, which decides
 // whether the pointer above calls a setter.
-func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool, error) {
+func (w *walk) setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool, error) {
 	if !field.CanSet() {
 		return false, nil
 	}
@@ -104,7 +234,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool,
 	}
 
 	isInitial := isInitialValue(field)
-	taken, err := fillField(field, tag, isInitial, pending)
+	taken, err := w.fillField(field, tag, isInitial, pending)
 
 	// A value Set found zero is put back to zero if anything below it failed: a pointer or container
 	// the tag allocated, a struct decoded partway, or what an unmarshaler wrote before it rejected the
@@ -119,7 +249,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool,
 
 // fillField is setField for a field it does not leave alone: it applies the tag if isInitial, which
 // reports whether the field is zero, and descends into the field.
-func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault) (bool, error) {
+func (w *walk) fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault) (bool, error) {
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
 
@@ -284,6 +414,10 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 				if err := json.Unmarshal([]byte(defaultVal), field.Addr().Interface()); err != nil {
 					return false, parseErr(err)
 				}
+
+				// Another path may have entered the struct, and the structs inside it, while they were
+				// still zero, and what the decode has put in them is not filled yet.
+				w.forget(field)
 			}
 		case reflect.Pointer:
 			field.Set(reflect.New(field.Type().Elem()))
@@ -301,7 +435,7 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 	switch field.Kind() {
 	case reflect.Pointer:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			taken, err := setField(field.Elem(), tag, pending)
+			taken, err := w.setField(field.Elem(), tag, pending)
 			if err != nil {
 				return false, err
 			}
@@ -317,43 +451,50 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 			return taken, nil
 		}
 	case reflect.Struct:
-		if err := set(field.Addr().Interface(), pending); err != nil {
+		if err := w.set(field.Addr().Interface(), pending); err != nil {
 			return false, err
 		}
 	case reflect.Slice:
-		for j := 0; j < field.Len(); j++ {
-			if _, err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
-				return false, err
+		// A slice with nothing in it is not entered, since a later path's tag may still fill it, and one
+		// whose elements hold nothing to fill is not walked.
+		if field.Len() > 0 && canHoldDefaults(field.Type().Elem()) && w.enter(field) {
+			for j := 0; j < field.Len(); j++ {
+				if _, err := w.setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+					return false, err
+				}
 			}
 		}
 	case reflect.Map:
-		for _, e := range field.MapKeys() {
-			v := field.MapIndex(e)
+		// A map whose values hold nothing to fill is not walked.
+		if canHoldDefaults(field.Type().Elem()) && w.enter(field) {
+			for _, e := range field.MapKeys() {
+				v := field.MapIndex(e)
 
-			// A pointer value is written through, so it needs no copy and no write-back. Everything
-			// else does: a map value is not addressable, so it is worked on as a copy and put back.
-			originalIsPtr := v.Kind() == reflect.Pointer
-			if originalIsPtr {
-				if v.IsNil() {
-					continue
-				}
-				v = v.Elem()
-			}
-
-			switch v.Kind() {
-			case reflect.Struct, reflect.Slice, reflect.Map:
-				if !v.CanAddr() {
-					copyValue := reflect.New(v.Type())
-					copyValue.Elem().Set(v)
-					v = copyValue.Elem()
+				// A pointer value is written through, so it needs no copy and no write-back. Everything
+				// else does: a map value is not addressable, so it is worked on as a copy and put back.
+				originalIsPtr := v.Kind() == reflect.Pointer
+				if originalIsPtr {
+					if v.IsNil() {
+						continue
+					}
+					v = v.Elem()
 				}
 
-				if _, err := setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
-					return false, err
-				}
+				switch v.Kind() {
+				case reflect.Struct, reflect.Slice, reflect.Map:
+					if !v.CanAddr() {
+						copyValue := reflect.New(v.Type())
+						copyValue.Elem().Set(v)
+						v = copyValue.Elem()
+					}
 
-				if !originalIsPtr {
-					field.SetMapIndex(e, v)
+					if _, err := w.setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+						return false, err
+					}
+
+					if !originalIsPtr {
+						field.SetMapIndex(e, v)
+					}
 				}
 			}
 		}

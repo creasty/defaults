@@ -7,9 +7,14 @@ import (
 
 // Setter is an interface for setting default values.
 //
-// Set calls SetDefaults on a struct once it has filled the struct's fields. A SetDefaults the struct
-// has only by promotion from an embedded field is not called on the struct: it belongs to the field,
-// which gets whatever call it would get as a named field.
+// Set calls SetDefaults on a struct once it has filled the struct's fields: once per call to Set,
+// even for a struct reachable by more than one path. There are two exceptions. A struct one path
+// leaves zero and a later path's tag then fills is filled again, and SetDefaults is called again to
+// see what the tag put in. And a map held under two element types that differ in their tags has its
+// struct values filled once under each.
+//
+// A SetDefaults the struct has only by promotion from an embedded field is not called on the struct:
+// it belongs to the field, which gets whatever call it would get as a named field.
 type Setter interface {
 	SetDefaults()
 }
