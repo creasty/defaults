@@ -212,6 +212,149 @@ func TestSet_MapOfPointerContainers(t *testing.T) {
 	assert.Equal(t, "inner", (*got.Maps["a"])["x"].Name)
 }
 
+// mapKeyHook runs hook when Set calls its setter, so a test can change the map holding it while Set
+// walks that map. It is package-level only because it needs a method.
+type mapKeyHook struct {
+	Mark string
+	hook func()
+}
+
+func (h *mapKeyHook) SetDefaults() {
+	h.hook()
+}
+
+// TestSet_MapStructValueIsStoredBack pins that a struct held as a map value is stored back under its
+// key once its copy is filled, whether or not anything changed. The structs here have nothing to
+// fill, and their setter changes the map under their own key while the copy is filled: the copy
+// stored afterwards brings a deleted key back and replaces a stored value.
+//
+// BUG: the store is a write to the map, even when nothing changed, so another goroutine reading the
+// map while Set runs is a data race, which can end the program with "concurrent map read and map
+// write". The maintainer keeps it as the contract, and the Set doc and the README say so: storing
+// only a changed copy takes telling one from an unchanged one, which
+// https://github.com/creasty/defaults/pull/101 did with a count of the writes made while the copy
+// was filled and a byte comparison against a second copy.
+func TestSet_MapStructValueIsStoredBack(t *testing.T) {
+	t.Run("a deleted key comes back", func(t *testing.T) {
+		got := struct {
+			Map map[string]mapKeyHook
+		}{Map: map[string]mapKeyHook{}}
+		got.Map["a"] = mapKeyHook{hook: func() { delete(got.Map, "a") }}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Contains(t, got.Map, "a")
+	})
+
+	t.Run("a stored value is replaced", func(t *testing.T) {
+		got := struct {
+			Map map[string]mapKeyHook
+		}{Map: map[string]mapKeyHook{}}
+		got.Map["a"] = mapKeyHook{hook: func() { got.Map["a"] = mapKeyHook{Mark: "stored"} }}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, got.Map["a"].Mark)
+	})
+}
+
+// TestSet_MapContainerValueIsNotStoredBack covers a slice or map held as a map value. Set fills a copy
+// of it too, but the copy refers to the same elements as the value in the map and those are filled in
+// place, so the copy still equals what it was copied from, and storing it back could only undo a
+// change a setter made under the value's key while the value's elements were filled. It is not
+// stored, so such a setter keeps its change.
+//
+// The subtests where another goroutine reads the map rely on the race detector, which make test and
+// make cover run: without -race they pass whether or not Set writes to the map.
+func TestSet_MapContainerValueIsNotStoredBack(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	t.Run("slice values", func(t *testing.T) {
+		t.Run("a deleted key stays deleted", func(t *testing.T) {
+			got := struct {
+				Map map[string][]mapKeyHook
+			}{Map: map[string][]mapKeyHook{}}
+			got.Map["a"] = []mapKeyHook{{hook: func() { delete(got.Map, "a") }}}
+
+			require.NoError(t, defaults.Set(&got))
+
+			assert.NotContains(t, got.Map, "a")
+		})
+
+		t.Run("a stored value stays", func(t *testing.T) {
+			got := struct {
+				Map map[string][]mapKeyHook
+			}{Map: map[string][]mapKeyHook{}}
+			got.Map["a"] = []mapKeyHook{{hook: func() { got.Map["a"] = []mapKeyHook{{Mark: "stored"}} }}}
+
+			require.NoError(t, defaults.Set(&got))
+
+			require.Len(t, got.Map["a"], 1)
+			assert.Equal(t, "stored", got.Map["a"][0].Mark)
+		})
+
+		t.Run("another goroutine reads the map", func(t *testing.T) {
+			got := struct {
+				Map map[string][]inner
+			}{Map: map[string][]inner{"a": {{}}}}
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_ = got.Map["a"]
+			}()
+			require.NoError(t, defaults.Set(&got))
+			<-done
+
+			assert.Equal(t, "inner", got.Map["a"][0].Name, "the element is filled in place")
+		})
+	})
+
+	t.Run("map values", func(t *testing.T) {
+		t.Run("a deleted key stays deleted", func(t *testing.T) {
+			got := struct {
+				Map map[string]map[string]mapKeyHook
+			}{Map: map[string]map[string]mapKeyHook{}}
+			got.Map["a"] = map[string]mapKeyHook{"b": {hook: func() { delete(got.Map, "a") }}}
+
+			require.NoError(t, defaults.Set(&got))
+
+			assert.NotContains(t, got.Map, "a")
+		})
+
+		t.Run("a stored value stays", func(t *testing.T) {
+			got := struct {
+				Map map[string]map[string]mapKeyHook
+			}{Map: map[string]map[string]mapKeyHook{}}
+			got.Map["a"] = map[string]mapKeyHook{"b": {hook: func() { got.Map["a"] = map[string]mapKeyHook{"stored": {}} }}}
+
+			require.NoError(t, defaults.Set(&got))
+
+			assert.Contains(t, got.Map["a"], "stored")
+		})
+
+		// The inner map holds pointers, so Set writes to neither map. With structs it would write to the
+		// inner one, which the goroutine does not read.
+		t.Run("another goroutine reads the map", func(t *testing.T) {
+			got := struct {
+				Map map[string]map[string]*inner
+			}{Map: map[string]map[string]*inner{"a": {"b": {}}}}
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_ = got.Map["a"]
+			}()
+			require.NoError(t, defaults.Set(&got))
+			<-done
+
+			assert.Equal(t, "inner", got.Map["a"]["b"].Name, "the value is filled through")
+		})
+	})
+}
+
 // TestSet_MapEntryUnderNaNKeyIsSkipped pins that an entry whose key is NaN gets no defaults. Each
 // value is looked up by its key, and NaN never equals itself, so the lookup finds nothing.
 //
