@@ -131,6 +131,14 @@ more than once, and a chain of values each shared by two pointers takes time tha
 link. Data with a cycle, such as a pointer back up to a parent, ends: where it leads back to a value
 still being walked, `Set` goes no further, and the walk already under way finishes that value.
 
+### Maps
+
+A struct held as a map value cannot be filled in place, so `Set` fills a copy and stores it back
+under its key: every such struct it walks, whether or not anything changed. That store is a write to
+the map, so do not call `Set` while another goroutine reads a map of structs it walks, even one with
+nothing left to fill. A slice, map or pointer held as a map value is filled through, and never
+stored back, so `Set` only reads the map holding it.
+
 ### Errors
 
 `Set` stops at the first field whose default fails and returns an error naming it. A value `Set`

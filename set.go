@@ -75,6 +75,10 @@ func (w *walking) repeats() bool {
 // A value reachable by more than one path is filled on each. Where data with a cycle leads back to a
 // value still being walked, Set goes no further, so a cycle ends.
 //
+// A struct held as a map value is not addressable, so Set fills a copy and stores it back under its
+// key whether or not anything changed: no other goroutine may read that map while Set runs. A slice,
+// map or pointer held as a map value is filled through, and not stored back.
+//
 // Set stops at the first field whose default fails and returns its error. A value Set found zero on
 // the way to that default is left zero again, so a second Set fails again; fields filled elsewhere
 // before the failure keep their defaults.
@@ -386,8 +390,16 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 		for _, e := range field.MapKeys() {
 			v := field.MapIndex(e)
 
-			// A pointer value is written through, so it needs no copy and no write-back. Everything
-			// else does: a map value is not addressable, so it is worked on as a copy and put back.
+			// A pointer value is written through, so it needs no copy. Any other map value is not
+			// addressable, so a struct, slice or map value is filled as a copy, and a struct copy is
+			// stored back under its key, changed or not: a write to the map, as the Set doc warns.
+			//
+			// A slice or map copy is not stored back. It is a header over the same array or table as
+			// the value in the map, which the walk fills in place without writing the header: with no
+			// tag, setField leaves an empty header alone and walks a non-empty one, which is not zero,
+			// without parsing it, and it resets only a value that was zero. So the copy still equals
+			// what it was copied from, and storing it could only undo a store or delete that a
+			// SetDefaults called in the walk made under this key.
 			originalIsPtr := v.Kind() == reflect.Pointer
 			if originalIsPtr {
 				if v.IsNil() {
@@ -408,7 +420,7 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 					return false, err
 				}
 
-				if !originalIsPtr {
+				if !originalIsPtr && v.Kind() == reflect.Struct {
 					field.SetMapIndex(e, v)
 				}
 			}

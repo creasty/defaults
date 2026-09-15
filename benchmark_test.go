@@ -449,7 +449,7 @@ func BenchmarkWalk(b *testing.B) {
 	})
 
 	// Each slice is copied out of the map and walked like a struct value, though its one element is
-	// shared with the map's own slice.
+	// shared with the map's own slice, and the copy is not stored back.
 	b.Run("map/slices/entries=100", func(b *testing.B) {
 		got := struct{ M map[string][]item }{M: make(map[string][]item, 100)}
 		for i := 0; i < 100; i++ {
