@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // ErrInvalidType is the error Set returns, and MustSet panics with, when the argument is not a
@@ -37,9 +38,42 @@ type pendingDefault struct {
 	outer *pendingDefault
 }
 
+// walking is a value being walked on the current path, linked to the one above it: a struct, by its
+// address, or a slice or map, by the array or table it refers to. Data the caller built with a
+// way back to itself leads the walk back to such a value, which Set used to follow until the stack
+// overflowed. The walk goes no further there instead, and the value is finished by the walk already
+// under way above. Nothing is kept once a value's walk returns, so a value that two paths reach
+// without either passing through the other is walked on both.
+//
+// The type is part of the name, since a struct shares its address with its first field and an array
+// with its first element, and so is a slice's length, since a longer slice over the same array has
+// elements the shorter one lacks. The address is held as an unsafe.Pointer, which keeps the value
+// alive while it is on the path, so no value made below can be given the same address.
+//
+// Each check scans the path above, so a walk n values deep makes on the order of n²/2 comparisons.
+type walking struct {
+	ptr   unsafe.Pointer
+	typ   reflect.Type
+	len   int
+	outer *walking
+}
+
+// repeats reports whether the value w names is already being walked above it, on w.outer's path.
+func (w *walking) repeats() bool {
+	for p := w.outer; p != nil; p = p.outer {
+		if p.ptr == w.ptr && p.typ == w.typ && p.len == w.len {
+			return true
+		}
+	}
+	return false
+}
+
 // Set fills the fields of the struct ptr points to from their `default` tags, and descends into
 // structs, pointers, slices and maps to do the same below. A field is written only while it holds
 // its zero value, and a nil map, slice or pointer is allocated only by a tag.
+//
+// A value reachable by more than one path is filled on each. Where data with a cycle leads back to a
+// value still being walked, Set goes no further, so a cycle ends.
 //
 // Set stops at the first field whose default fails and returns its error. A value Set found zero on
 // the way to that default is left zero again, so a second Set fails again; fields filled elsewhere
@@ -47,12 +81,12 @@ type pendingDefault struct {
 //
 // ptr should be a non-nil struct pointer, or Set returns ErrInvalidType.
 func Set(ptr interface{}) error {
-	return set(ptr, nil)
+	return set(ptr, nil, nil)
 }
 
 // set is Set, for a struct that may be reached by recursion and so carries the tags still being
-// applied above it.
-func set(ptr interface{}, pending *pendingDefault) error {
+// applied above it and the values being walked on the path to it.
+func set(ptr interface{}, pending *pendingDefault, path *walking) error {
 	// The kind is read off the Value because reflect.TypeOf(nil) is itself nil, and a nil pointer
 	// has no struct behind it to fill: its Elem is an invalid Value, which has no Type. See
 	// https://github.com/creasty/defaults/issues/69.
@@ -61,11 +95,19 @@ func set(ptr interface{}, pending *pendingDefault) error {
 		return ErrInvalidType
 	}
 
+	p := v.UnsafePointer()
 	v = v.Elem()
 	t := v.Type()
 
 	if t.Kind() != reflect.Struct {
 		return ErrInvalidType
+	}
+
+	// The struct type, not ptr's: a caller may hand Set a named pointer type, while the recursion
+	// below reaches the same struct as a plain *T.
+	here := walking{ptr: p, typ: t, outer: path}
+	if here.repeats() {
+		return nil
 	}
 
 	for i := 0; i < t.NumField(); i++ {
@@ -78,7 +120,7 @@ func set(ptr interface{}, pending *pendingDefault) error {
 			fieldName: t.Field(i).Name,
 			value:     defaultVal,
 			present:   ok,
-		}, pending); err != nil {
+		}, pending, &here); err != nil {
 			return err
 		}
 	}
@@ -94,7 +136,7 @@ func set(ptr interface{}, pending *pendingDefault) error {
 // setField fills field from its tag and descends into it. It reports whether an UnmarshalText or
 // UnmarshalJSON took the tag, the field's own or, behind a pointer, its pointee's, which decides
 // whether the pointer above calls a setter.
-func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool, error) {
+func setField(field reflect.Value, tag fieldTag, pending *pendingDefault, path *walking) (bool, error) {
 	if !field.CanSet() {
 		return false, nil
 	}
@@ -104,7 +146,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool,
 	}
 
 	isInitial := isInitialValue(field)
-	taken, err := fillField(field, tag, isInitial, pending)
+	taken, err := fillField(field, tag, isInitial, pending, path)
 
 	// A value Set found zero is put back to zero if anything below it failed: a pointer or container
 	// the tag allocated, a struct decoded partway, or what an unmarshaler wrote before it rejected the
@@ -119,7 +161,7 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault) (bool,
 
 // fillField is setField for a field it does not leave alone: it applies the tag if isInitial, which
 // reports whether the field is zero, and descends into the field.
-func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault) (bool, error) {
+func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault, path *walking) (bool, error) {
 	// Kept as a local because the parsing below reads better against a plain name.
 	defaultVal := tag.value
 
@@ -301,36 +343,44 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 	switch field.Kind() {
 	case reflect.Pointer:
 		if isInitial || field.Elem().Kind() == reflect.Struct {
-			taken, err := setField(field.Elem(), tag, pending)
+			taken, err := setField(field.Elem(), tag, pending, path)
 			if err != nil {
 				return false, err
 			}
 
 			// A struct pointee's setter is not called here: Set has called it as the recursion
-			// finished, or skipped it because it is promoted or because an unmarshaler took the tag.
-			// Anything else behind a pointer the tag allocated gets no setter call but this one, and
-			// none when UnmarshalText or UnmarshalJSON was handed the tag and took it, as a struct
-			// gets none then.
+			// finished, or skipped it because it is promoted, because an unmarshaler took the tag,
+			// or because the struct is already being walked above. Anything else behind a pointer
+			// the tag allocated gets no setter call but this one, and none when UnmarshalText or
+			// UnmarshalJSON was handed the tag and took it, as a struct gets none then.
 			if field.Elem().Kind() != reflect.Struct && !taken {
 				callSetter(field.Interface())
 			}
 			return taken, nil
 		}
 	case reflect.Struct:
-		if err := set(field.Addr().Interface(), pending); err != nil {
+		if err := set(field.Addr().Interface(), pending, path); err != nil {
 			return false, err
 		}
 	case reflect.Slice:
 		if !canHoldDefaults(field.Type().Elem()) {
 			break
 		}
+		here := walking{ptr: field.UnsafePointer(), typ: field.Type(), len: field.Len(), outer: path}
+		if here.repeats() {
+			break
+		}
 		for j := 0; j < field.Len(); j++ {
-			if _, err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+			if _, err := setField(field.Index(j), fieldTag{fieldName: tag.fieldName}, pending, &here); err != nil {
 				return false, err
 			}
 		}
 	case reflect.Map:
 		if !canHoldDefaults(field.Type().Elem()) {
+			break
+		}
+		here := walking{ptr: field.UnsafePointer(), typ: field.Type(), outer: path}
+		if here.repeats() {
 			break
 		}
 		for _, e := range field.MapKeys() {
@@ -354,7 +404,7 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 					v = copyValue.Elem()
 				}
 
-				if _, err := setField(v, fieldTag{fieldName: tag.fieldName}, pending); err != nil {
+				if _, err := setField(v, fieldTag{fieldName: tag.fieldName}, pending, &here); err != nil {
 					return false, err
 				}
 

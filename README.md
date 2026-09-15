@@ -122,6 +122,15 @@ without that counting as taking the tag. A value built from a parent's JSON tag,
 of a slice, is filled like any other too, whatever unmarshaler `encoding/json` ran while decoding
 it.
 
+### Shared and cyclic values
+
+`Set` keeps track of the values on the path it is walking, not of every value it has walked. A value
+reachable by more than one path -- two pointers to one struct, a map two fields hold -- is filled on
+each path, and its `SetDefaults` is called on each, so a setter that is not idempotent applies itself
+more than once, and a chain of values each shared by two pointers takes time that doubles with every
+link. Data with a cycle, such as a pointer back up to a parent, ends: where it leads back to a value
+still being walked, `Set` goes no further, and the walk already under way finishes that value.
+
 ### Errors
 
 `Set` stops at the first field whose default fails and returns an error naming it. A value `Set`
