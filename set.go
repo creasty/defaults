@@ -76,8 +76,9 @@ func (w *walking) repeats() bool {
 // value still being walked, Set goes no further, so a cycle ends.
 //
 // A struct held as a map value is not addressable, so Set fills a copy and stores it back under its
-// key whether or not anything changed: no other goroutine may read that map while Set runs. A slice,
-// map or pointer held as a map value is filled through, and not stored back.
+// key whether or not anything changed: no other goroutine may read that map while Set runs. No
+// other map value is stored back. A slice or map held as a map value is filled through, and so is
+// a pointer to a struct, slice or map, but a pointer to anything else, such as a **T, is not.
 //
 // Set stops at the first field whose default fails and returns its error. A value Set found zero on
 // the way to that default is left zero again, so a second Set fails again; fields filled elsewhere

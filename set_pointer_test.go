@@ -138,6 +138,105 @@ func TestSet_UntaggedPointerStructRecurses(t *testing.T) {
 	assert.Equal(t, child{Name: "Jim", Age: 20}, *got.Child, "the caller's name survives, the missing age is filled")
 }
 
+// TestSet_CallerPointerToContainerIsSkipped covers a pointer the caller allocated to a slice, a map or
+// a pointer, as a field, a slice element and a map value.
+//
+// QUIRK: Set does not descend into such a pointer, so what a caller's *[]T, *map[K]T or **T holds
+// gets no defaults, a default that would fail there is not reported, and a tag on the pointer stops
+// at it. Yet a *[]T or *map[K]T held as a map value is descended into, and has been since v1.6.0
+// (TestSet_MapOfPointerContainers), as a caller's pointer to a struct is anywhere
+// (TestSet_UntaggedPointerStructRecurses). https://github.com/creasty/defaults/pull/100 descended
+// into all three and was closed in favor of this pin: that walks every element behind such a
+// pointer on each Set, and a pointer to a pointer can lead back to itself with no struct, slice or
+// map between, which is all the cycle guard tracks.
+func TestSet_CallerPointerToContainerIsSkipped(t *testing.T) {
+	type inner struct {
+		Name string `default:"inner"`
+	}
+
+	t.Run("a *[]T field", func(t *testing.T) {
+		slice := []inner{{}}
+		got := struct {
+			Ptr *[]inner
+		}{Ptr: &slice}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, slice[0].Name)
+	})
+
+	t.Run("a *map[K]T field", func(t *testing.T) {
+		mapping := map[string]inner{"a": {}}
+		got := struct {
+			Ptr *map[string]inner
+		}{Ptr: &mapping}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, mapping["a"].Name)
+	})
+
+	t.Run("a **T field", func(t *testing.T) {
+		ptr := &inner{}
+		got := struct {
+			Ptr **inner
+		}{Ptr: &ptr}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, ptr.Name)
+	})
+
+	t.Run("a *[]T slice element", func(t *testing.T) {
+		slice := []inner{{}}
+		got := struct {
+			Slices []*[]inner
+		}{Slices: []*[]inner{&slice}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, slice[0].Name)
+	})
+
+	t.Run("a **T map value", func(t *testing.T) {
+		ptr := &inner{}
+		got := struct {
+			Map map[string]**inner
+		}{Map: map[string]**inner{"a": &ptr}}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Empty(t, ptr.Name)
+	})
+
+	t.Run("a tag on a *[]T field", func(t *testing.T) {
+		var slice []string
+		got := struct {
+			Ptr *[]string `default:"[\"tag\"]"`
+		}{Ptr: &slice}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Same(t, &slice, got.Ptr)
+		assert.Nil(t, slice, "the tag does not reach the caller's nil slice")
+	})
+
+	t.Run("a default that would fail behind a *[]T field", func(t *testing.T) {
+		type bad struct {
+			Ints []int `default:"[!]"`
+		}
+
+		slice := []bad{{}}
+		got := struct {
+			Ptr *[]bad
+		}{Ptr: &slice}
+
+		require.NoError(t, defaults.Set(&got))
+
+		assert.Nil(t, slice[0].Ints)
+	})
+}
+
 // TestSet_PointerWithEmptyTag covers `default:""` on a pointer. The tag is present, so the pointer
 // is allocated and points at the zero value — it used to stay nil, which left no way to ask for a
 // pointer to an empty string. See https://github.com/creasty/defaults/issues/52.
