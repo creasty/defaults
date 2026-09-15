@@ -187,7 +187,7 @@ func BenchmarkParse(b *testing.B) {
 		})
 	})
 
-	// Both int64 parsers fail and their errors are joined before the empty tag is let through.
+	// Both int64 parsers fail on the empty tag, which is let through without joining their errors.
 	b.Run("empty_tag", func(b *testing.B) {
 		type st struct {
 			V time.Duration `default:""`

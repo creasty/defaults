@@ -250,11 +250,14 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 			// The duration attempt tolerates surrounding whitespace, the numeric fallback does not.
 			// When both fail, both errors are reported, since the tag may have been meant for either,
 			// unless the type's own unmarshaler rejected it first: parseErr reports that rejection.
+			// An empty tag fails both as well, and parseErr would report nothing for it, so the
+			// errors are joined only for a tag that is not empty: the join formats both messages,
+			// which every empty tag would otherwise pay for.
 			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
 			} else if val, intErr := strconv.ParseInt(defaultVal, 0, 64); intErr == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
-			} else {
+			} else if defaultVal != "" {
 				return false, parseErr(fmt.Errorf("%w; %w", err, intErr))
 			}
 		case reflect.Uint:
