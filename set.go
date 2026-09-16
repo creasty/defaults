@@ -141,9 +141,6 @@ func setField(field reflect.Value, tag fieldTag, pending *pendingDefault, path *
 // fillField is setField for a field it does not leave alone: it applies the tag if isInitial, which
 // reports whether the field is zero, and descends into the field.
 func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendingDefault, path *walking) (bool, error) {
-	// Kept as a local because the parsing below reads better against a plain name.
-	defaultVal := tag.value
-
 	if isInitial {
 		// What a tag makes of a zero value depends on nothing but the value's type and the tag. So
 		// meeting the same pair below where it is already being applied means meeting it again below
@@ -153,14 +150,14 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 		// https://github.com/creasty/defaults/issues/71.
 		if tag.present {
 			for p := pending; p != nil; p = p.outer {
-				if p.typ == field.Type() && p.value == defaultVal {
-					return false, fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, defaultVal)
+				if p.typ == field.Type() && p.value == tag.value {
+					return false, fmt.Errorf("field %s: default %q recurses without end", tag.fieldName, tag.value)
 				}
 			}
-			pending = &pendingDefault{typ: field.Type(), value: defaultVal, outer: pending}
+			pending = &pendingDefault{typ: field.Type(), value: tag.value, outer: pending}
 		}
 
-		unmarshaled, unmarshalErr := unmarshalTag(field.Addr().Interface(), defaultVal)
+		unmarshaled, unmarshalErr := unmarshalTag(field.Addr().Interface(), tag.value)
 		if unmarshaled {
 			return true, nil
 		}
@@ -173,43 +170,43 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 		// kind was only the fall-back, and its failure names a parser the tag was never written for:
 		// encoding/json, for a struct. See https://github.com/creasty/defaults/issues/79.
 		parseErr := func(err error) error {
-			if defaultVal == "" {
+			if tag.value == "" {
 				return nil
 			}
 			if unmarshalErr != nil {
 				err = unmarshalErr
 			}
 
-			return fmt.Errorf("field %s: invalid default %q: %w", tag.fieldName, defaultVal, err)
+			return fmt.Errorf("field %s: invalid default %q: %w", tag.fieldName, tag.value, err)
 		}
 
 		switch field.Kind() {
 		case reflect.Bool:
-			val, err := strconv.ParseBool(defaultVal)
+			val, err := strconv.ParseBool(tag.value)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Int:
-			val, err := strconv.ParseInt(defaultVal, 0, strconv.IntSize)
+			val, err := strconv.ParseInt(tag.value, 0, strconv.IntSize)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int(val)).Convert(field.Type()))
 		case reflect.Int8:
-			val, err := strconv.ParseInt(defaultVal, 0, 8)
+			val, err := strconv.ParseInt(tag.value, 0, 8)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int8(val)).Convert(field.Type()))
 		case reflect.Int16:
-			val, err := strconv.ParseInt(defaultVal, 0, 16)
+			val, err := strconv.ParseInt(tag.value, 0, 16)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(int16(val)).Convert(field.Type()))
 		case reflect.Int32:
-			val, err := strconv.ParseInt(defaultVal, 0, 32)
+			val, err := strconv.ParseInt(tag.value, 0, 32)
 			if err != nil {
 				return false, parseErr(err)
 			}
@@ -227,69 +224,69 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 			// An empty tag fails both as well, and parseErr would report nothing for it, so the
 			// errors are joined only for a tag that is not empty: the join formats both messages,
 			// which every empty tag would otherwise pay for.
-			if val, err := time.ParseDuration(strings.TrimSpace(defaultVal)); err == nil {
+			if val, err := time.ParseDuration(strings.TrimSpace(tag.value)); err == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
-			} else if val, intErr := strconv.ParseInt(defaultVal, 0, 64); intErr == nil {
+			} else if val, intErr := strconv.ParseInt(tag.value, 0, 64); intErr == nil {
 				field.Set(reflect.ValueOf(val).Convert(field.Type()))
-			} else if defaultVal != "" {
+			} else if tag.value != "" {
 				return false, parseErr(fmt.Errorf("%w; %w", err, intErr))
 			}
 		case reflect.Uint:
-			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
+			val, err := strconv.ParseUint(tag.value, 0, strconv.IntSize)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint(val)).Convert(field.Type()))
 		case reflect.Uint8:
-			val, err := strconv.ParseUint(defaultVal, 0, 8)
+			val, err := strconv.ParseUint(tag.value, 0, 8)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint8(val)).Convert(field.Type()))
 		case reflect.Uint16:
-			val, err := strconv.ParseUint(defaultVal, 0, 16)
+			val, err := strconv.ParseUint(tag.value, 0, 16)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint16(val)).Convert(field.Type()))
 		case reflect.Uint32:
-			val, err := strconv.ParseUint(defaultVal, 0, 32)
+			val, err := strconv.ParseUint(tag.value, 0, 32)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uint32(val)).Convert(field.Type()))
 		case reflect.Uint64:
-			val, err := strconv.ParseUint(defaultVal, 0, 64)
+			val, err := strconv.ParseUint(tag.value, 0, 64)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.Uintptr:
-			val, err := strconv.ParseUint(defaultVal, 0, strconv.IntSize)
+			val, err := strconv.ParseUint(tag.value, 0, strconv.IntSize)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(uintptr(val)).Convert(field.Type()))
 		case reflect.Float32:
-			val, err := strconv.ParseFloat(defaultVal, 32)
+			val, err := strconv.ParseFloat(tag.value, 32)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(float32(val)).Convert(field.Type()))
 		case reflect.Float64:
-			val, err := strconv.ParseFloat(defaultVal, 64)
+			val, err := strconv.ParseFloat(tag.value, 64)
 			if err != nil {
 				return false, parseErr(err)
 			}
 			field.Set(reflect.ValueOf(val).Convert(field.Type()))
 		case reflect.String:
-			field.Set(reflect.ValueOf(defaultVal).Convert(field.Type()))
+			field.Set(reflect.ValueOf(tag.value).Convert(field.Type()))
 
 		case reflect.Slice:
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeSlice(field.Type(), 0, 0))
-			if defaultVal != "" && defaultVal != "[]" {
-				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+			if tag.value != "" && tag.value != "[]" {
+				if err := json.Unmarshal([]byte(tag.value), ref.Interface()); err != nil {
 					return false, parseErr(err)
 				}
 			}
@@ -297,15 +294,15 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 		case reflect.Map:
 			ref := reflect.New(field.Type())
 			ref.Elem().Set(reflect.MakeMap(field.Type()))
-			if defaultVal != "" && defaultVal != "{}" {
-				if err := json.Unmarshal([]byte(defaultVal), ref.Interface()); err != nil {
+			if tag.value != "" && tag.value != "{}" {
+				if err := json.Unmarshal([]byte(tag.value), ref.Interface()); err != nil {
 					return false, parseErr(err)
 				}
 			}
 			field.Set(ref.Elem().Convert(field.Type()))
 		case reflect.Struct:
-			if defaultVal != "" && defaultVal != "{}" {
-				if err := json.Unmarshal([]byte(defaultVal), field.Addr().Interface()); err != nil {
+			if tag.value != "" && tag.value != "{}" {
+				if err := json.Unmarshal([]byte(tag.value), field.Addr().Interface()); err != nil {
 					return false, parseErr(err)
 				}
 			}
