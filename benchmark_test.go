@@ -301,6 +301,26 @@ func BenchmarkWalk(b *testing.B) {
 		})
 	}
 
+	// A linked list the caller built, its pointers untagged: the path grows to 1000 structs below the one
+	// Set is handed, and Set checks each struct it enters against the path above it.
+	b.Run("pointer/caller_chain/depth=1000", func(b *testing.B) {
+		type link struct {
+			Name string `default:"item"`
+			Next *link
+		}
+		head := &link{}
+		for i := 0; i < 1000; i++ {
+			head = &link{Next: head}
+		}
+		benchRepeat(b, head, func() bool {
+			n, depth := head, 0
+			for ; n.Next != nil; n = n.Next {
+				depth++
+			}
+			return depth == 1000 && head.Name == "item" && n.Name == "item"
+		})
+	})
+
 	// The tagged pointers are set back to nil on every iteration, so each is allocated and parsed again.
 	b.Run("pointer/tagged_ints/fields=10", func(b *testing.B) {
 		typ := benchStruct(10, reflect.TypeOf((*int)(nil)), `default:"1"`)
