@@ -34,7 +34,7 @@ bench-compare:
 
 .PHONY: cover
 cover:
-	@go test $(GO_TEST_FLAGS) -covermode=atomic -coverprofile=coverage.out .
+	@go test $(GO_TEST_FLAGS) -covermode=atomic -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out
 	@total="$$(go tool cover -func=coverage.out | awk '/^total:/ { print $$3 }')"; \
 		if [ "$$total" != "$(COVERAGE_MIN)%" ]; then \
