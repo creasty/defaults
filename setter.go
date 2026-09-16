@@ -2,8 +2,6 @@ package defaults
 
 import (
 	"reflect"
-
-	"github.com/creasty/defaults/internal/method"
 )
 
 // Setter is an interface for setting default values.
@@ -24,7 +22,7 @@ func callSetter(v interface{}) {
 
 // hasPromotedSetter reports whether the SetDefaults of t, a struct type whose pointer implements
 // Setter, is promoted from an embedded field rather than declared by t itself. How that is told
-// apart is method.IsPromoted's business; which method is Setter's, so the name stays here.
+// apart is isPromotedMethod's business; which method is Setter's, so the name stays here.
 func hasPromotedSetter(t reflect.Type) bool {
-	return method.IsPromoted(t, "SetDefaults")
+	return isPromotedMethod(t, "SetDefaults")
 }

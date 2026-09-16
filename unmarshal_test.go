@@ -1,4 +1,4 @@
-package unmarshal_test
+package defaults
 
 import (
 	"errors"
@@ -6,10 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/creasty/defaults/internal/unmarshal"
 )
 
+// This test is in package defaults rather than defaults_test: unmarshalTag is unexported, and the
+// suite could otherwise show its rules only through Set, which needs a struct and a tag to ask any of
+// them. What Set makes of them is pinned from outside, in set_unmarshaler_test.go.
+//
 // The fixtures record what they were offered, so a test can tell an unmarshaler that was never asked
 // from one that was asked and took it, and each carries the error it refuses with, so a test can name
 // the rejection it expects back. They are package-level because each carries a method, and named with
@@ -78,13 +80,13 @@ func (u *unmarshalJSONRejects) UnmarshalJSON([]byte) error { return u.refusal }
 // unmarshalNeither implements neither.
 type unmarshalNeither struct{}
 
-// TestTag_Taken covers a value one of the target's unmarshalers takes, which is the whole point of
-// offering it: the caller parses nothing itself when Tag reports true.
-func TestTag_Taken(t *testing.T) {
+// TestUnmarshalTag_Taken covers a value one of the target's unmarshalers takes, which is the whole
+// point of offering it: the caller parses nothing itself when unmarshalTag reports true.
+func TestUnmarshalTag_Taken(t *testing.T) {
 	t.Run("by UnmarshalText", func(t *testing.T) {
 		target := &unmarshalText{}
 
-		taken, err := unmarshal.Tag(target, "8080")
+		taken, err := unmarshalTag(target, "8080")
 
 		assert.True(t, taken)
 		require.NoError(t, err)
@@ -94,7 +96,7 @@ func TestTag_Taken(t *testing.T) {
 	t.Run("by UnmarshalJSON, with no UnmarshalText to ask first", func(t *testing.T) {
 		target := &unmarshalJSON{}
 
-		taken, err := unmarshal.Tag(target, "8080")
+		taken, err := unmarshalTag(target, "8080")
 
 		assert.True(t, taken)
 		require.NoError(t, err)
@@ -104,7 +106,7 @@ func TestTag_Taken(t *testing.T) {
 	t.Run("by UnmarshalJSON, after UnmarshalText refused it", func(t *testing.T) {
 		target := &unmarshalTextRejects{refusal: errors.New("no")}
 
-		taken, err := unmarshal.Tag(target, "8080")
+		taken, err := unmarshalTag(target, "8080")
 
 		assert.True(t, taken)
 		require.NoError(t, err)
@@ -112,12 +114,12 @@ func TestTag_Taken(t *testing.T) {
 	})
 }
 
-// TestTag_TextIsAskedFirst covers the order: a target that implements both is asked through
+// TestUnmarshalTag_TextIsAskedFirst covers the order: a target that implements both is asked through
 // UnmarshalText, and UnmarshalJSON is never offered the value.
-func TestTag_TextIsAskedFirst(t *testing.T) {
+func TestUnmarshalTag_TextIsAskedFirst(t *testing.T) {
 	target := &unmarshalBoth{}
 
-	taken, err := unmarshal.Tag(target, "8080")
+	taken, err := unmarshalTag(target, "8080")
 
 	assert.True(t, taken)
 	require.NoError(t, err)
@@ -125,13 +127,14 @@ func TestTag_TextIsAskedFirst(t *testing.T) {
 	assert.Empty(t, target.data, "UnmarshalJSON is not offered a value UnmarshalText took")
 }
 
-// TestTag_Rejected covers what the caller reports when neither took the value: UnmarshalText's
-// rejection, since it was asked first, and UnmarshalJSON's when there was no UnmarshalText to ask.
-func TestTag_Rejected(t *testing.T) {
+// TestUnmarshalTag_Rejected covers what the caller reports when neither took the value:
+// UnmarshalText's rejection, since it was asked first, and UnmarshalJSON's when there was no
+// UnmarshalText to ask.
+func TestUnmarshalTag_Rejected(t *testing.T) {
 	t.Run("both refuse, so the first rejection is the error", func(t *testing.T) {
 		target := &unmarshalBothReject{textRefusal: errors.New("text"), jsonRefusal: errors.New("json")}
 
-		taken, err := unmarshal.Tag(target, "8080")
+		taken, err := unmarshalTag(target, "8080")
 
 		assert.False(t, taken)
 		assert.Same(t, target.textRefusal, err)
@@ -140,20 +143,20 @@ func TestTag_Rejected(t *testing.T) {
 	t.Run("only UnmarshalJSON is there, and refuses", func(t *testing.T) {
 		target := &unmarshalJSONRejects{refusal: errors.New("json")}
 
-		taken, err := unmarshal.Tag(target, "8080")
+		taken, err := unmarshalTag(target, "8080")
 
 		assert.False(t, taken)
 		assert.Same(t, target.refusal, err)
 	})
 }
 
-// TestTag_NotOffered covers the values an unmarshaler is not asked about at all, which leave the
-// target as it was and report no error: there is nothing to report when nothing was asked.
-func TestTag_NotOffered(t *testing.T) {
+// TestUnmarshalTag_NotOffered covers the values an unmarshaler is not asked about at all, which leave
+// the target as it was and report no error: there is nothing to report when nothing was asked.
+func TestUnmarshalTag_NotOffered(t *testing.T) {
 	t.Run("an empty value, to either", func(t *testing.T) {
 		target := &unmarshalBoth{}
 
-		taken, err := unmarshal.Tag(target, "")
+		taken, err := unmarshalTag(target, "")
 
 		assert.False(t, taken)
 		require.NoError(t, err)
@@ -165,7 +168,7 @@ func TestTag_NotOffered(t *testing.T) {
 		for _, value := range []string{"{}", "[]"} {
 			target := &unmarshalJSON{}
 
-			taken, err := unmarshal.Tag(target, value)
+			taken, err := unmarshalTag(target, value)
 
 			assert.False(t, taken, value)
 			require.NoError(t, err, value)
@@ -177,7 +180,7 @@ func TestTag_NotOffered(t *testing.T) {
 		for _, value := range []string{"{}", "[]"} {
 			target := &unmarshalText{}
 
-			taken, err := unmarshal.Tag(target, value)
+			taken, err := unmarshalTag(target, value)
 
 			assert.True(t, taken, value)
 			require.NoError(t, err, value)
@@ -186,7 +189,7 @@ func TestTag_NotOffered(t *testing.T) {
 	})
 
 	t.Run("anything, to a target that implements neither", func(t *testing.T) {
-		taken, err := unmarshal.Tag(&unmarshalNeither{}, "8080")
+		taken, err := unmarshalTag(&unmarshalNeither{}, "8080")
 
 		assert.False(t, taken)
 		assert.NoError(t, err)

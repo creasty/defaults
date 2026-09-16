@@ -1,14 +1,12 @@
-// Package method answers what reflect alone does not about a type's methods: where the code behind
-// one comes from.
-package method
+package defaults
 
 import (
 	"reflect"
 	"runtime"
 )
 
-// IsPromoted reports whether the method called name is promoted from an embedded field rather than
-// declared by t itself.
+// isPromotedMethod reports whether the method called name is promoted from an embedded field rather
+// than declared by t itself.
 //
 // reflect lists the two alike, under the same name and signature in the same method set, so this asks
 // where the method's code comes from instead. For a promoted method the compiler generates a wrapper
@@ -19,8 +17,10 @@ import (
 // is in the pointer's set too, as exactly such a generated wrapper.
 //
 // t, or a pointer to t, must have the method. With neither there is no code to ask about, and
-// IsPromoted panics rather than answer for a method that is not there.
-func IsPromoted(t reflect.Type, name string) bool {
+// isPromotedMethod panics rather than answer for a method that is not there.
+//
+// Which method the walk cares about is not this file's business: the caller names it.
+func isPromotedMethod(t reflect.Type, name string) bool {
 	m, ok := t.MethodByName(name)
 	if !ok {
 		m, _ = reflect.PointerTo(t).MethodByName(name)

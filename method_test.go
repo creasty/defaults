@@ -1,16 +1,18 @@
-package method_test
+package defaults
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/creasty/defaults/internal/method"
 )
 
-// The fixtures declare a method of no particular name, since the package knows of none: what the
-// caller asks about is its own business. The types are package-level because each carries a method,
+// This test is in package defaults rather than defaults_test: isPromotedMethod is unexported, and Set
+// reaches it only with a struct, a setter and a walk, to ask one question about a type. What Set makes
+// of the answer is pinned from outside, in setter_test.go.
+//
+// The fixtures declare a method of no particular name, since the file knows of none: which method the
+// walk cares about is setter.go's business. The types are package-level because each carries a method,
 // and named with a file-unique prefix.
 
 // methodValue declares Ping on a value receiver.
@@ -47,9 +49,9 @@ type methodPinger interface{ Ping() }
 
 type methodEmbedsInterface struct{ methodPinger }
 
-// TestIsPromoted covers where the code behind a method comes from, which reflect reports alike for a
-// method a type declares and one it takes from an embedded field.
-func TestIsPromoted(t *testing.T) {
+// TestIsPromotedMethod covers where the code behind a method comes from, which reflect reports alike
+// for a method a type declares and one it takes from an embedded field.
+func TestIsPromotedMethod(t *testing.T) {
 	tests := []struct {
 		name string
 		typ  reflect.Type
@@ -67,7 +69,7 @@ func TestIsPromoted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, method.IsPromoted(tt.typ, "Ping"))
+			assert.Equal(t, tt.want, isPromotedMethod(tt.typ, "Ping"))
 		})
 	}
 }

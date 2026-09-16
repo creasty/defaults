@@ -1,13 +1,12 @@
-// Package unmarshal offers a value to the unmarshalers a target implements.
-package unmarshal
+package defaults
 
 import (
 	"encoding"
 	"encoding/json"
 )
 
-// Tag offers value to target's own unmarshalers, UnmarshalText first and UnmarshalJSON second, and
-// reports whether one took it.
+// unmarshalTag offers value to target's own unmarshalers, UnmarshalText first and UnmarshalJSON
+// second, and reports whether one took it.
 //
 // An empty value is offered to neither: it asks for the target's zero value rather than for anything
 // to be parsed. "{}" and "[]" are kept from UnmarshalJSON, which would read them as an empty object
@@ -18,8 +17,9 @@ import (
 // when neither was offered anything.
 //
 // target is what an unmarshaler is implemented on, so the caller passes a pointer to the value rather
-// than the value.
-func Tag(target any, value string) (bool, error) {
+// than the value. Taking that rather than a reflect.Value keeps reflect out of the contract, and
+// leaves the caller making field.Addr().Interface() once for both type assertions rather than twice.
+func unmarshalTag(target any, value string) (bool, error) {
 	var textErr, jsonErr error
 
 	asText, ok := target.(encoding.TextUnmarshaler)
