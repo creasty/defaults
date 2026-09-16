@@ -1,7 +1,6 @@
 package defaults
 
 import (
-	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/creasty/defaults/internal/unmarshal"
 )
 
 // ErrInvalidType is the error Set returns, and MustSet panics with, when the argument is not a
@@ -341,7 +342,7 @@ func fillField(field reflect.Value, tag fieldTag, isInitial bool, pending *pendi
 			pending = &pendingDefault{typ: field.Type(), value: defaultVal, outer: pending}
 		}
 
-		unmarshaled, unmarshalErr := unmarshalByInterface(field, defaultVal)
+		unmarshaled, unmarshalErr := unmarshal.Tag(field.Addr().Interface(), defaultVal)
 		if unmarshaled {
 			return true, nil
 		}
@@ -613,35 +614,6 @@ func canHoldDefaults(t reflect.Type) bool {
 		return true
 	}
 	return false
-}
-
-// unmarshalByInterface offers the tag to the field's own unmarshalers ahead of parsing by kind,
-// and reports whether one took it. When none did, the error is the rejection that setField
-// reports unless parsing by kind takes the tag instead, or nil when neither unmarshaler was
-// offered the tag.
-func unmarshalByInterface(field reflect.Value, defaultVal string) (bool, error) {
-	var textErr, jsonErr error
-
-	asText, ok := field.Addr().Interface().(encoding.TextUnmarshaler)
-	if ok && defaultVal != "" {
-		// if field implements encode.TextUnmarshaler, try to use it before decode by kind
-		if textErr = asText.UnmarshalText([]byte(defaultVal)); textErr == nil {
-			return true, nil
-		}
-	}
-	asJSON, ok := field.Addr().Interface().(json.Unmarshaler)
-	if ok && defaultVal != "" && defaultVal != "{}" && defaultVal != "[]" {
-		// if field implements json.Unmarshaler, try to use it before decode by kind
-		if jsonErr = asJSON.UnmarshalJSON([]byte(defaultVal)); jsonErr == nil {
-			return true, nil
-		}
-	}
-
-	// UnmarshalText is offered the tag first, so if both rejected it, its rejection is reported.
-	if textErr != nil {
-		return false, textErr
-	}
-	return false, jsonErr
 }
 
 // shouldInitializeField reports whether the field's own state warrants visiting it, regardless of
