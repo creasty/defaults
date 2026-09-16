@@ -34,10 +34,11 @@ type methodEmbedsPointerField struct{ *methodValue }
 // methodEmbedsTwice takes it from a field that took it from a field.
 type methodEmbedsTwice struct{ methodEmbedsValue }
 
-// methodShadows declares its own over the one it would take from its field.
+// methodShadows declares its own over the one it would take from its field, and calls through to it,
+// as a type that means to add to an embedded method does.
 type methodShadows struct{ methodValue }
 
-func (methodShadows) SetDefaults() {}
+func (s methodShadows) SetDefaults() { s.methodValue.SetDefaults() }
 
 // methodSetter is embedded as an interface, so the method is promoted from a field that holds it.
 type methodSetter interface{ SetDefaults() }
