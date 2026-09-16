@@ -26,8 +26,12 @@ currently supported one. Keep the two in step.
 stay beside the source, not in a subdirectory: coverage of `.` and the `Example*` functions
 pkg.go.dev renders both depend on the tests living in the package's own directory.
 
-A package under `internal/` holds machinery the root package's tests can only reach through `Set`, and
-carries its own tests beside it, black box as well (`package <name>_test`) wherever its API allows.
+Machinery the public API reaches only through `Set` — the promoted-method check, the unmarshaler
+handoff, the path check — lives in a file of its own, with its tests beside it in `package defaults`
+rather than `package defaults_test`, since nothing else can reach it. Those files are the only
+exception to the black-box rule above. Keep them in the root package: behind an `internal/` package
+the walk's hot path crosses a package boundary, which measured 1.7% to 4.1% slower across seven of
+the eleven `Walk/slice` and `Walk/map` rows, though the inlining and escape decisions are identical.
 
 - Declare each test's struct inside the test function. Package-level types only where a method is
   required (`SetDefaults`, `UnmarshalText`, `UnmarshalJSON`), named with a file-unique prefix —
