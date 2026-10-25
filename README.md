@@ -151,12 +151,13 @@ taken, so calling `Set` again fails again. Fields filled elsewhere before the fa
 defaults.
 
 
-## Design principles
+## Scope
 
-**Keep it simple.** The scope is narrow by design — read a tag, fill a field — and is meant to stay
-that way. Adjacent concerns belong in adjacent libraries.
+The library reads a tag and fills a field. Its public API stays as it is, and changes only where a
+change to the Go language spec requires it: features adjacent to filling defaults belong in
+libraries of their own.
 
-**Stay comprehensive.** Broad type support and high test coverage are what make the library
+Within that scope, broad type support and high test coverage are what make the library
 trustworthy. Statement coverage is 100% and CI enforces it, and every supported type has a test
 pinning its behavior — including the behavior that looks wrong, which is pinned with a comment
 saying so rather than left to be rediscovered.
