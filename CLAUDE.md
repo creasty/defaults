@@ -1,8 +1,7 @@
 # defaults
 
-A reflection-based library that fills struct fields from `default:"..."` tags. Narrow scope by
-design — read the design principles in
-[#61](https://github.com/creasty/defaults/issues/61) before widening it.
+A reflection-based library that fills struct fields from `default:"..."` tags. Its scope is fixed:
+read [Scope](./README.md#scope) in the README before proposing a change to the public API.
 
 ## Commands
 
